@@ -1,0 +1,11 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+*.nupkg
+
+## OS
+.DS_Store
+Thumbs.db

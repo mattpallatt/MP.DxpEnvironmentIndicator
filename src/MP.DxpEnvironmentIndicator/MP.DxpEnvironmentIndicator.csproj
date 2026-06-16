@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>MP.DxpEnvironmentIndicator</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Matt Pallatt</Authors>
+    <Description>An Optimizely CMS 12 add-in that badges the current DXP environment (Integration / Preproduction / Production) into the shell's top navigation bar, so editors always know which environment they are working in. The environment is matched from the request host against a small DDS-backed admin page — no per-environment code or config files.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EPiServer.CMS.Core" Version="[12.0.0, 13.0.0)" />
+    <PackageReference Include="EPiServer.CMS.UI.Core" Version="[12.0.0, 13.0.0)" />
+  </ItemGroup>
+</Project>

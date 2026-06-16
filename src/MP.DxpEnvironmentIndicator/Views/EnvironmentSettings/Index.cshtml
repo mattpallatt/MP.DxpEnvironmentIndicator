@@ -1,0 +1,109 @@
+@model MP.DxpEnvironmentIndicator.Models.EnvironmentSettingsViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>DXP Environment Indicator — Settings</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px; color: #1a1a1a; background: #fff; margin: 0; padding: 24px 28px; line-height: 1.5;
+        }
+        h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+        .sub { color: #555; margin: 0 0 20px; max-width: 720px; }
+        .intro { background: #f4f8ff; border: 1px solid #d6e4fb; border-radius: 6px; padding: 14px 16px; margin-bottom: 24px; max-width: 720px; }
+        .intro p { margin: 0 0 8px; }
+        .intro p:last-child { margin-bottom: 0; }
+        .env { border: 1px solid #e3e3e3; border-radius: 6px; padding: 16px 18px; margin-bottom: 16px; max-width: 720px; }
+        .env h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+        label { display: block; font-size: 13px; font-weight: 500; color: #333; margin: 0 0 4px; }
+        input[type=text] {
+            width: 100%; max-width: 480px; padding: 7px 9px; border: 1px solid #bbb; border-radius: 3px;
+            font-size: 14px; margin-bottom: 12px; background: #fff; color: #1a1a1a;
+        }
+        input[type=text]:focus, input[type=color]:focus { outline: none; border-color: #2973c3; box-shadow: 0 0 0 2px rgba(41,115,195,0.2); }
+        .color-row { display: flex; align-items: center; gap: 10px; }
+        input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; }
+        .color-hint { color: #777; font-size: 12px; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 22px; max-width: 720px; }
+        .checkbox-row label { margin: 0; font-weight: 400; }
+        button {
+            padding: 9px 18px; background: #2973c3; color: #fff; border: none; border-radius: 3px;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+        }
+        button:hover { background: #1f5ea3; }
+        .saved { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
+        .error { background: #fdecea; color: #b71c1c; border: 1px solid #ef9a9a; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
+    </style>
+</head>
+<body>
+    <h1>DXP Environment Indicator</h1>
+    <p class="sub">Badge the current DXP environment into the CMS top bar so editors always know where they are.</p>
+
+    @if (Model.Saved)
+    {
+        <div class="saved">&#10003; Settings saved.</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="error">@Model.ErrorMessage</div>
+    }
+
+    <div class="intro">
+        <p><strong>How it works:</strong> enter the <em>Base URL</em> of each environment. The running site identifies
+        itself by matching the browser's request host against these URLs — so the same settings can be saved on every
+        environment, and each one badges itself correctly.</p>
+        <p>Host-matching is used (rather than a stored "this is X" flag) because it can't be clobbered when DXP copies
+        database content between environments. Only the host part of each URL is compared; port and scheme are ignored.</p>
+    </div>
+
+    <form method="post" action="/EPiServer/DxpEnvironmentIndicator/Admin/Settings">
+        @Html.AntiForgeryToken()
+
+        <div class="env">
+            <h2>Integration</h2>
+            <label for="i-url">Base URL</label>
+            <input type="text" id="i-url" name="IntegrationBaseUrl" value="@Model.IntegrationBaseUrl" placeholder="https://your-inte-slot.dxcloud.episerver.net" />
+            <label>Badge colour</label>
+            <div class="color-row">
+                <input type="color" name="IntegrationColor" value="@(Model.IntegrationColor ?? "#d4651a")" />
+                <span class="color-hint">Shown as the pill background.</span>
+            </div>
+        </div>
+
+        <div class="env">
+            <h2>Preproduction</h2>
+            <label for="p-url">Base URL</label>
+            <input type="text" id="p-url" name="PreproductionBaseUrl" value="@Model.PreproductionBaseUrl" placeholder="https://your-prep-slot.dxcloud.episerver.net" />
+            <label>Badge colour</label>
+            <div class="color-row">
+                <input type="color" name="PreproductionColor" value="@(Model.PreproductionColor ?? "#7b2fff")" />
+                <span class="color-hint">Shown as the pill background.</span>
+            </div>
+        </div>
+
+        <div class="env">
+            <h2>Production</h2>
+            <label for="pr-url">Base URL</label>
+            <input type="text" id="pr-url" name="ProductionBaseUrl" value="@Model.ProductionBaseUrl" placeholder="https://www.example.com" />
+            <label>Badge colour</label>
+            <div class="color-row">
+                <input type="color" name="ProductionColor" value="@(Model.ProductionColor ?? "#c0392b")" />
+                <span class="color-hint">Only shown if the box below is ticked.</span>
+            </div>
+        </div>
+
+        <div class="checkbox-row">
+            <input type="checkbox" id="showprod" name="ShowOnProduction" value="true" @(Model.ShowOnProduction ? "checked" : "") />
+            <label for="showprod">Show a badge on Production (off by default — a missing badge is the "you're on prod" signal)</label>
+        </div>
+
+        <button type="submit">Save Settings</button>
+    </form>
+</body>
+</html>
