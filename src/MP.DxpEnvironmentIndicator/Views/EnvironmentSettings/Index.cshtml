@@ -1,4 +1,7 @@
 @model MP.DxpEnvironmentIndicator.Models.EnvironmentSettingsViewModel
+@using System.Text.Json
+@using MP.DxpEnvironmentIndicator.Services
+@using MP.DxpEnvironmentIndicator.Controllers
 @{
     Layout = null;
 }
@@ -39,6 +42,14 @@
         button:hover { background: #1f5ea3; }
         .saved { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
         .error { background: #fdecea; color: #b71c1c; border: 1px solid #ef9a9a; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
+        details.advanced { max-width: 720px; margin: 0 0 22px; border: 1px solid #e3e3e3; border-radius: 6px; }
+        details.advanced > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; font-size: 14px; list-style: none; user-select: none; }
+        details.advanced > summary::-webkit-details-marker { display: none; }
+        details.advanced > summary::before { content: '\25B8'; display: inline-block; margin-right: 8px; color: #888; transition: transform 0.15s; }
+        details.advanced[open] > summary::before { transform: rotate(90deg); }
+        .advanced-body { padding: 0 16px 16px; }
+        .help { color: #777; font-size: 12px; margin: 0 0 8px; max-width: 640px; }
+        code { background: #f3f4f6; border: 1px solid #e3e3e3; border-radius: 3px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -69,6 +80,9 @@
             <h2>Integration</h2>
             <label for="i-url">Base URL</label>
             <input type="text" id="i-url" name="IntegrationBaseUrl" value="@Model.IntegrationBaseUrl" placeholder="https://your-inte-slot.dxcloud.episerver.net" />
+            <label for="i-label">Environment label</label>
+            <input type="text" id="i-label" name="IntegrationLabel" value="@Model.IntegrationLabel" placeholder="INTEGRATION" maxlength="24" />
+            <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="IntegrationColor" value="@(Model.IntegrationColor ?? "#d4651a")" />
@@ -80,6 +94,9 @@
             <h2>Preproduction</h2>
             <label for="p-url">Base URL</label>
             <input type="text" id="p-url" name="PreproductionBaseUrl" value="@Model.PreproductionBaseUrl" placeholder="https://your-prep-slot.dxcloud.episerver.net" />
+            <label for="p-label">Environment label</label>
+            <input type="text" id="p-label" name="PreproductionLabel" value="@Model.PreproductionLabel" placeholder="PREPRODUCTION" maxlength="24" />
+            <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="PreproductionColor" value="@(Model.PreproductionColor ?? "#7b2fff")" />
@@ -91,19 +108,60 @@
             <h2>Production</h2>
             <label for="pr-url">Base URL</label>
             <input type="text" id="pr-url" name="ProductionBaseUrl" value="@Model.ProductionBaseUrl" placeholder="https://www.example.com" />
+            <label for="pr-label">Environment label</label>
+            <input type="text" id="pr-label" name="ProductionLabel" value="@Model.ProductionLabel" placeholder="PRODUCTION" maxlength="24" />
+            <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="ProductionColor" value="@(Model.ProductionColor ?? "#c0392b")" />
-                <span class="color-hint">Only shown if the box below is ticked.</span>
+                <span class="color-hint">Shown as the pill background (unless production is unticked below).</span>
             </div>
         </div>
 
         <div class="checkbox-row">
             <input type="checkbox" id="showprod" name="ShowOnProduction" value="true" @(Model.ShowOnProduction ? "checked" : "") />
-            <label for="showprod">Show a badge on Production (off by default — a missing badge is the "you're on prod" signal)</label>
+            <label for="showprod">Show a badge on Production (on by default — untick to leave production unbadged)</label>
         </div>
+
+        <details class="advanced" @(string.IsNullOrWhiteSpace(Model.Selector) ? "" : "open")>
+            <summary>Advanced settings</summary>
+            <div class="advanced-body">
+                <label for="selector">Top-bar selector override</label>
+                <p class="help">
+                    The CSS selector for the top-bar element the badge is placed next to. You should only need
+                    this if an Optimizely CMS update moves the environment label and the badge stops appearing —
+                    set it to the new element's selector to fix placement without a package update. Leave blank
+                    to use the built-in default.
+                </p>
+                <input type="text" id="selector" name="Selector" value="@Model.Selector" placeholder="@EnvironmentClientResourceController.DefaultSelector" />
+                <p class="help">Default: <code>@EnvironmentClientResourceController.DefaultSelector</code></p>
+            </div>
+        </details>
 
         <button type="submit">Save Settings</button>
     </form>
+
+    @if (Model.Saved)
+    {
+        <script>
+            // This page is iframed into the admin shell (same origin), so on save we update the live
+            // badge in the parent immediately — no logout/login needed. We key off the badge's identity
+            // attribute (not its visible text, which may now be a custom label) and apply that
+            // environment's new label and colours.
+            (function () {
+                try {
+                    var badge = window.top.document.querySelector('.dxp-env-badge');
+                    if (!badge) return;
+                    var map = {
+                        'Integration': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Integration", Model.IntegrationLabel))), bg: '@Model.IntegrationColor', text: '@ContrastColor.Text(Model.IntegrationColor)' },
+                        'Preproduction': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Preproduction", Model.PreproductionLabel))), bg: '@Model.PreproductionColor', text: '@ContrastColor.Text(Model.PreproductionColor)' },
+                        'Production': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Production", Model.ProductionLabel))), bg: '@Model.ProductionColor', text: '@ContrastColor.Text(Model.ProductionColor)' }
+                    };
+                    var c = map[badge.getAttribute('data-dxp-env')];
+                    if (c && c.bg) { badge.textContent = c.label; badge.style.background = c.bg; badge.style.color = c.text; }
+                } catch (e) { /* cross-origin or no parent badge — nothing to update */ }
+            })();
+        </script>
+    }
 </body>
 </html>

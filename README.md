@@ -2,8 +2,9 @@
 
 An Optimizely CMS 12 add-in that badges the current DXP environment into the shell's top
 navigation bar, so editors always know whether they're on **Integration**, **Preproduction**, or
-**Production**. Integration shows orange, Preproduction purple, and Production stays silent by
-default (a missing badge is the "you're on prod" signal).
+**Production**. Integration shows orange, Preproduction purple, and Production red. All three are
+badged by default; you can turn the Production badge off so a missing badge becomes the "you're on
+prod" signal.
 
 It is fully standalone — it has **no dependency** on any other add-in.
 
@@ -43,8 +44,10 @@ If the request host matches nothing, the indicator falls back to `ASPNETCORE_ENV
 | Field | Notes |
 |-------|-------|
 | Integration / Preproduction / Production **Base URL** | The host the running site is reached on for that environment. Used for host-matching. |
-| Badge **colour** | The pill background colour for that environment. |
-| **Show a badge on Production** | Off by default. Tick to badge production too. |
+| **Environment label** | The pill text for that environment. Blank uses the upper-cased environment name; otherwise shown as typed. Keep it short. |
+| Badge **colour** | The pill background colour for that environment. Text colour (dark/white) is chosen automatically for contrast. |
+| **Show a badge on Production** | On by default. Untick to leave production unbadged. |
+| **Advanced → Top-bar selector** | Optional CSS-selector override for where the badge is placed, in case a CMS update moves the label. Blank uses the built-in default. |
 
 ## How it works (internals)
 

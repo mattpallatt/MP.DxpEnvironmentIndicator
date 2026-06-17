@@ -15,19 +15,27 @@ public class EnvironmentIndicatorSettings : IDynamicData
 
     public string IntegrationBaseUrl { get; set; }
     public string IntegrationColor { get; set; }
+    public string IntegrationLabel { get; set; }
 
     public string PreproductionBaseUrl { get; set; }
     public string PreproductionColor { get; set; }
+    public string PreproductionLabel { get; set; }
 
     public string ProductionBaseUrl { get; set; }
     public string ProductionColor { get; set; }
+    public string ProductionLabel { get; set; }
 
-    // Production is silent by default — a missing badge is the "you're on prod" signal. Opt in here.
-    public bool ShowOnProduction { get; set; }
+    // Whether to badge Production too. On by default; untick on the settings page to leave production
+    // unbadged (so a missing badge becomes the "you're on prod" signal).
+    public bool ShowOnProduction { get; set; } = true;
+
+    // Optional override for the CSS selector the badge is placed next to. Blank uses the built-in
+    // default; an admin can change it here if a CMS update moves the top-bar label (advanced).
+    public string Selector { get; set; }
 
     // Returns the environment whose configured BaseUrl host matches the request host, or default
     // ((null, null, null)) when nothing matches. Host-only comparison, so port/scheme don't matter.
-    public (string Name, string BaseUrl, string Color) DetectByHost(string host)
+    public (string Name, string BaseUrl, string Color, string Label) DetectByHost(string host)
     {
         if (string.IsNullOrWhiteSpace(host)) return default;
         foreach (var env in All())
@@ -40,10 +48,10 @@ public class EnvironmentIndicatorSettings : IDynamicData
         return default;
     }
 
-    public IEnumerable<(string Name, string BaseUrl, string Color)> All() => new[]
+    public IEnumerable<(string Name, string BaseUrl, string Color, string Label)> All() => new[]
     {
-        ("Integration", IntegrationBaseUrl, IntegrationColor),
-        ("Preproduction", PreproductionBaseUrl, PreproductionColor),
-        ("Production", ProductionBaseUrl, ProductionColor),
+        ("Integration", IntegrationBaseUrl, IntegrationColor, IntegrationLabel),
+        ("Preproduction", PreproductionBaseUrl, PreproductionColor, PreproductionLabel),
+        ("Production", ProductionBaseUrl, ProductionColor, ProductionLabel),
     };
 }

@@ -9,28 +9,38 @@ namespace MP.DxpEnvironmentIndicator.Controllers;
 // top-bar environment badge. Served from a controller (rather than packaged static assets) so the
 // class library is self-contained — there is no host-side ClientResources folder to deploy.
 [AllowAnonymous]
-public class EnvironmentClientResourceController(IEnvironmentResolver resolver) : Controller
+public class EnvironmentClientResourceController(IEnvironmentResolver resolver, IEnvironmentSettingsService settings) : Controller
 {
+    // The CSS selector for the top-bar label the badge is placed next to. Overridable from the
+    // settings page (advanced) in case a CMS update moves it; this is the built-in fallback.
+    public const string DefaultSelector = ".epi-pn-navigation__section--align-center .flex--1.truncate";
+
     [HttpGet]
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/AdminInit.js")]
     [ResponseCache(Duration = 300)]
     public IActionResult AdminInit() =>
         Content(AdminInitScript, "application/javascript; charset=utf-8");
 
-    // Resolves the environment server-side from the request host and bakes the name/colour into the
-    // script (no client-side fetch). When nothing should show (production opt-out, or an unmatched
-    // host outside local dev) an inert script is returned.
+    // Resolves the environment server-side from the request host and bakes the name, background and
+    // (accessibility-aware) text colour, and selector into the script — no client-side fetch and no
+    // response cache, so a colour or selector change takes effect on the next load. When nothing
+    // should show (production opt-out, or an unmatched host outside local dev) an inert script is returned.
     [HttpGet]
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/EnvIndicator.js")]
-    [ResponseCache(Duration = 60)]
     public IActionResult EnvIndicator()
     {
         var env = resolver.Resolve(Request.Host.Host ?? string.Empty);
         if (env == null)
             return Content("/* DXP environment indicator: no badge for this environment */", "application/javascript; charset=utf-8");
 
-        var prelude = $"var __DXP_ENV={JsonSerializer.Serialize(env.Name.ToUpperInvariant())};"
-                    + $"var __DXP_COLOR={JsonSerializer.Serialize(env.Color)};\n";
+        var selector = settings.Get().Selector;
+        if (string.IsNullOrWhiteSpace(selector)) selector = DefaultSelector;
+
+        var prelude = $"var __DXP_ENV={JsonSerializer.Serialize(env.Name)};"
+                    + $"var __DXP_LABEL={JsonSerializer.Serialize(env.Label)};"
+                    + $"var __DXP_COLOR={JsonSerializer.Serialize(env.Color)};"
+                    + $"var __DXP_TEXT={JsonSerializer.Serialize(ContrastColor.Text(env.Color))};"
+                    + $"var __DXP_SELECTOR={JsonSerializer.Serialize(selector)};\n";
         return Content(prelude + EnvIndicatorScript, "application/javascript; charset=utf-8");
     }
 
@@ -138,20 +148,20 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver) 
     // with a hard 15s deadline so pages that never show the bar (e.g. login) don't observe forever.
     private const string EnvIndicatorScript = """
     (function () {
-        var LABEL = '.epi-pn-navigation__section--align-center .flex--1.truncate';
         var deadline = Date.now() + 15000;
 
         function apply() {
-            var label = document.querySelector(LABEL);
+            var label = document.querySelector(__DXP_SELECTOR);
             if (!label) return false;
             var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') || label.parentElement;
             if (!host || !host.parentElement) return false;
             if (host.parentElement.querySelector('.dxp-env-badge')) return true;
             var badge = document.createElement('span');
             badge.className = 'dxp-env-badge';
-            badge.textContent = __DXP_ENV;
+            badge.setAttribute('data-dxp-env', __DXP_ENV);
+            badge.textContent = __DXP_LABEL;
             badge.style.cssText = 'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
-                ';color:#fff;font-size:11px;font-weight:700;border-radius:3px;letter-spacing:0.5px;' +
+                ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;letter-spacing:0.5px;' +
                 'margin-left:8px;flex-shrink:0;white-space:nowrap;';
             host.insertAdjacentElement('afterend', badge);
             return true;

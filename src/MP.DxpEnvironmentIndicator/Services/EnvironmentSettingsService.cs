@@ -3,32 +3,19 @@ using MP.DxpEnvironmentIndicator.Models;
 
 namespace MP.DxpEnvironmentIndicator.Services;
 
-// Loads/saves the indicator settings from the Dynamic Data Store, caching after the first load.
-// DynamicDataStoreFactory uses IDatabaseExecutor, which has thread affinity — caching keeps reads
-// cheap and off the DB after warm-up.
+// Loads/saves the indicator settings from the Dynamic Data Store. Not cached: the settings script is
+// only fetched on full shell/admin page loads (not a hot path), and reading fresh each time means a
+// colour or selector change takes effect on the very next load with no process-wide stale state.
+// (Unlike the content-transfer add-in, nothing here runs on a background thread, so there is no
+// thread-affinity reason to cache.)
 public class EnvironmentSettingsService : IEnvironmentSettingsService
 {
-    private EnvironmentIndicatorSettings _cached;
-    private readonly object _lock = new();
-
     public EnvironmentIndicatorSettings Get()
     {
-        lock (_lock)
-        {
-            if (_cached != null) return _cached;
-        }
-
         var store = DynamicDataStoreFactory.Instance.GetStore(typeof(EnvironmentIndicatorSettings));
-        var settings = store == null
+        return store == null
             ? new EnvironmentIndicatorSettings()
             : store.LoadAll<EnvironmentIndicatorSettings>().FirstOrDefault() ?? new EnvironmentIndicatorSettings();
-
-        lock (_lock)
-        {
-            _cached = settings;
-        }
-
-        return settings;
     }
 
     public void Save(EnvironmentIndicatorSettings settings)
@@ -41,10 +28,5 @@ public class EnvironmentSettingsService : IEnvironmentSettingsService
             settings.Id = existing.Id;
 
         store.Save(settings);
-
-        lock (_lock)
-        {
-            _cached = settings;
-        }
     }
 }
