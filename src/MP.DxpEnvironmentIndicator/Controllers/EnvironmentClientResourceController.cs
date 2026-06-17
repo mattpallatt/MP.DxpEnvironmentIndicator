@@ -13,13 +13,39 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
 {
     // The CSS selector for the top-bar label the badge is placed next to. Overridable from the
     // settings page (advanced) in case a CMS update moves it; this is the built-in fallback.
-    public const string DefaultSelector = ".epi-pn-navigation__section--align-center .flex--1.truncate";
+    // Targets .flex--1.truncate anywhere inside the OPN web component — does not assume a specific
+    // section alignment class, which differs between CMS 12 and CMS 13.
+    public const string DefaultSelector = "epi-pn-navigation .flex--1.truncate";
 
     [HttpGet]
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/AdminInit.js")]
-    [ResponseCache(Duration = 300)]
+    [ResponseCache(Duration = 60)]
     public IActionResult AdminInit() =>
         Content(AdminInitScript, "application/javascript; charset=utf-8");
+
+    // CMS 13 Add-ons iframe entry point.  The shell's module router iframes this physical-style URL
+    // (it's under our registered module prefix); the page immediately redirects the iframe to the
+    // actual Razor settings controller so no server-rendered content lives in a static file.
+    [HttpGet]
+    [Route("~/Optimizely/DxpEnvironmentIndicator/settings.html")]
+    [ResponseCache(Duration = 0, NoStore = true)]
+    public IActionResult SettingsEntry() => Content("""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Enviro-helper</title></head>
+        <body style="margin:0">
+        <script>window.location.replace('/EPiServer/DxpEnvironmentIndicator/settings');</script>
+        </body>
+        </html>
+        """, "text/html; charset=utf-8");
+
+    // Stub AMD module served at the module's ClientResources path.  Satisfies any runtime
+    // resource checks the shell performs after the module is registered.
+    [HttpGet]
+    [Route("~/Optimizely/DxpEnvironmentIndicator/ClientResources/init.js")]
+    [ResponseCache(Duration = 3600)]
+    public IActionResult ModuleInit() =>
+        Content("// Enviro-helper module init", "application/javascript; charset=utf-8");
 
     // Resolves the environment server-side from the request host and bakes the name, background and
     // (accessibility-aware) text colour, and selector into the script — no client-side fetch and no
@@ -44,65 +70,59 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
         return Content(prelude + EnvIndicatorScript, "application/javascript; charset=utf-8");
     }
 
-    // Watches location.hash; when it matches our route, overlays an iframe of the standalone settings
-    // page over the admin content pane (anchored to the right of the side-bar nav, which is present on
-    // every admin route including ours) and hides it again on navigation elsewhere.
+    // CMS 12 only. Watches location.hash; when it matches our route it overlays a fixed-position
+    // iframe of the settings page over the admin content pane (right of the sidebar nav, so the
+    // shell chrome stays visible), then hides it again when the hash changes away. This keeps the
+    // admin SPA in the browser history so the shell nav remains present throughout.
     private const string AdminInitScript = """
     (function () {
         var ROUTE = '#/EnvIndicator/Settings';
         var FRAME_ID = 'dxp-env-settings-frame';
-        var SETTINGS_URL = '/EPiServer/DxpEnvironmentIndicator/Admin/Settings';
+        var SETTINGS_URL = '/EPiServer/DxpEnvironmentIndicator/settings';
         var NAV_SELECTOR = '.epi-side-bar-navigation';
         var CONTENT_SELECTOR = '.content-area-container';
         var trackTimer = null;
 
         function topOffset() {
             var nav = document.querySelector(
-                '.epi-navigation, #epi-shellHeader, [class*="shellHeader"], [class*="GlobalNavigation"], header[role="banner"]');
-            var bottom = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
-            return bottom > 0 ? bottom : 48;
+                '.epi-navigation, #epi-shellHeader, [class*="shellHeader"], header[role="banner"]');
+            var b = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+            return b > 0 ? b : 48;
         }
 
-        function rectOf(selector, minW, minH) {
-            var el = document.querySelector(selector);
-            if (el) {
-                var r = el.getBoundingClientRect();
-                if (r.width > minW && r.height > minH) return r;
-            }
+        function rectOf(sel, minW, minH) {
+            var el = document.querySelector(sel);
+            if (el) { var r = el.getBoundingClientRect(); if (r.width > minW && r.height > minH) return r; }
             return null;
         }
 
         function applyGeometry(frame) {
             var nav = rectOf(NAV_SELECTOR, 100, 100);
             if (nav) {
-                frame.style.top = nav.top + 'px';
-                frame.style.left = nav.right + 'px';
-                frame.style.width = Math.max(0, window.innerWidth - nav.right) + 'px';
+                frame.style.top    = nav.top + 'px';
+                frame.style.left   = nav.right + 'px';
+                frame.style.width  = Math.max(0, window.innerWidth - nav.right) + 'px';
                 frame.style.height = nav.height + 'px';
                 return;
             }
-            var content = rectOf(CONTENT_SELECTOR, 100, 100);
-            if (content) {
-                frame.style.top = content.top + 'px';
-                frame.style.left = content.left + 'px';
-                frame.style.width = content.width + 'px';
-                frame.style.height = content.height + 'px';
+            var c = rectOf(CONTENT_SELECTOR, 100, 100);
+            if (c) {
+                frame.style.top = c.top + 'px'; frame.style.left = c.left + 'px';
+                frame.style.width = c.width + 'px'; frame.style.height = c.height + 'px';
                 return;
             }
             var t = topOffset();
-            frame.style.top = t + 'px';
-            frame.style.left = '0';
-            frame.style.width = '100vw';
-            frame.style.height = 'calc(100vh - ' + t + 'px)';
+            frame.style.top = t + 'px'; frame.style.left = '0';
+            frame.style.width = '100vw'; frame.style.height = 'calc(100vh - ' + t + 'px)';
         }
 
         function showFrame() {
             var frame = document.getElementById(FRAME_ID);
             if (!frame) {
                 frame = document.createElement('iframe');
-                frame.id = FRAME_ID;
-                frame.src = SETTINGS_URL;
-                frame.title = 'DXP Environment Indicator Settings';
+                frame.id    = FRAME_ID;
+                frame.src   = SETTINGS_URL;
+                frame.title = 'Enviro-helper Settings';
                 frame.style.cssText = 'position:fixed;border:0;z-index:2147483000;background:#fff;';
                 document.body.appendChild(frame);
             }
@@ -121,8 +141,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
         }
 
         function sync() {
-            if ((location.hash || '').indexOf(ROUTE) === 0) showFrame();
-            else hideFrame();
+            if ((location.hash || '').indexOf(ROUTE) === 0) showFrame(); else hideFrame();
         }
 
         window.addEventListener('hashchange', sync);
@@ -131,38 +150,93 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
             if (f && f.style.display !== 'none') applyGeometry(f);
         });
 
-        if (document.readyState === 'loading')
-            document.addEventListener('DOMContentLoaded', sync);
-        else
-            sync();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync);
+        else sync();
 
         [250, 750, 1500].forEach(function (ms) { setTimeout(sync, ms); });
     })();
     """;
 
-    // Reads __DXP_ENV / __DXP_COLOR from the prelude. Finds the product label cell ("CMS") in the top
-    // navigation's centre section and inserts a coloured environment pill immediately after it, so the
-    // bar reads "CMS [ENV]". The badge is appended (not an innerHTML rewrite) so it survives the SPA
-    // re-rendering the label, and is idempotent via the .dxp-env-badge marker. The shell renders
-    // asynchronously, so it retries via a MutationObserver until the cell exists, then disconnects —
-    // with a hard 15s deadline so pages that never show the bar (e.g. login) don't observe forever.
+    // Reads __DXP_ENV / __DXP_COLOR from the prelude. Finds the "CMS" product label in the top OPN
+    // navigation bar and inserts a coloured environment pill next to it. Tries the configured selector
+    // first, then a chain of known selectors for CMS 12 and CMS 13, then a text-content fallback that
+    // finds any nav button whose visible text is exactly "CMS". The badge is idempotent via the
+    // .dxp-env-badge marker. The OPN renders asynchronously so a MutationObserver retries for 15 s.
     private const string EnvIndicatorScript = """
     (function () {
         var deadline = Date.now() + 15000;
+        var BADGE_CLASS = 'dxp-env-badge';
+
+        var SELECTORS = [
+            __DXP_SELECTOR,                                              // "epi-pn-navigation .flex--1.truncate"
+            '.epi-pn-navigation .flex--1.truncate',                      // class-based OPN container (CMS 12/13)
+            '.epi-pn-navigation__section--align-center .flex--1.truncate',
+            '.epi-pn-navigation__section--align-start .flex--1.truncate', // CMS 13 may use --align-start
+            'epi-pn-navigation .oui-button span',
+            '.epi-pn-navigation .oui-button span',
+            '.platform-navigation-wrapper .flex--1.truncate',
+            '[class*="platform-navigation"] .truncate'
+        ];
+        var seen = {}, selectors = [];
+        for (var i = 0; i < SELECTORS.length; i++) {
+            if (SELECTORS[i] && !seen[SELECTORS[i]]) { seen[SELECTORS[i]] = 1; selectors.push(SELECTORS[i]); }
+        }
+
+        function findLabelBySelector() {
+            for (var i = 0; i < selectors.length; i++) {
+                try {
+                    var els = document.querySelectorAll(selectors[i]);
+                    for (var j = 0; j < els.length; j++) {
+                        if ((els[j].textContent || '').trim() === 'CMS') return els[j];
+                    }
+                } catch(e) {}
+            }
+            return null;
+        }
+
+        // Text-content fallback: any button/span inside a nav-looking element whose text is "CMS"
+        function findLabelByText() {
+            var candidates = document.querySelectorAll(
+                'epi-pn-navigation button, epi-pn-navigation span, ' +
+                '[class*="navigation"] button, [class*="navigation"] span');
+            for (var i = 0; i < candidates.length; i++) {
+                var el = candidates[i];
+                if ((el.textContent || '').trim() === 'CMS' && el.children.length === 0) return el;
+            }
+            return null;
+        }
+
+        function findLabel() {
+            return findLabelBySelector() || findLabelByText();
+        }
+
+        function alreadyBadged(anchor) {
+            var p = anchor.parentElement;
+            while (p) {
+                if (p.querySelector('.' + BADGE_CLASS)) return true;
+                if (p === document.body) break;
+                p = p.parentElement;
+            }
+            return false;
+        }
 
         function apply() {
-            var label = document.querySelector(__DXP_SELECTOR);
+            var label = findLabel();
             if (!label) return false;
-            var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') || label.parentElement;
+            var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') ||
+                       label.closest('button') || label.parentElement;
             if (!host || !host.parentElement) return false;
-            if (host.parentElement.querySelector('.dxp-env-badge')) return true;
+            if (alreadyBadged(host)) return true;
+
             var badge = document.createElement('span');
-            badge.className = 'dxp-env-badge';
+            badge.className = BADGE_CLASS;
             badge.setAttribute('data-dxp-env', __DXP_ENV);
             badge.textContent = __DXP_LABEL;
-            badge.style.cssText = 'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
-                ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;letter-spacing:0.5px;' +
-                'margin-left:8px;flex-shrink:0;white-space:nowrap;';
+            badge.style.cssText =
+                'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
+                ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;' +
+                'letter-spacing:0.5px;margin-left:8px;flex-shrink:0;white-space:nowrap;' +
+                'vertical-align:middle;';
             host.insertAdjacentElement('afterend', badge);
             return true;
         }
@@ -172,7 +246,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
             var obs = new MutationObserver(function () {
                 if (apply() || Date.now() > deadline) obs.disconnect();
             });
-            obs.observe(document.body, { childList: true, subtree: true });
+            obs.observe(document.body, { childList: true, subtree: true, characterData: true });
             setTimeout(function () { obs.disconnect(); }, 15000);
         }
 

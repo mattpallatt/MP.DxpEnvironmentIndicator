@@ -23,6 +23,12 @@ internal static class HtmlBodyInjector
             context.Response.Body = originalBody;
         }
 
+        // 304 Not Modified and 204 No Content must have no body. ASP.NET Core throws if
+        // anything is written to the response stream for these status codes.
+        var status = context.Response.StatusCode;
+        if (status == 304 || status == 204 || status < 200)
+            return;
+
         buffer.Position = 0;
         var contentType = context.Response.ContentType ?? string.Empty;
 

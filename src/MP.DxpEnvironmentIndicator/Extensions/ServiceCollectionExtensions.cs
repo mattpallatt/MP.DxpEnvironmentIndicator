@@ -1,6 +1,7 @@
-using EPiServer.Shell.Modules;
+using EPiServer.Shell.Navigation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using MP.DxpEnvironmentIndicator.Menu;
 using MP.DxpEnvironmentIndicator.Middleware;
 using MP.DxpEnvironmentIndicator.Services;
 
@@ -8,9 +9,6 @@ namespace MP.DxpEnvironmentIndicator.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    // Call from the host's ConfigureServices. Registers everything the indicator needs and wires the
-    // script-injecting middleware automatically (via IStartupFilter), so no Configure() changes are
-    // required in the host.
     public static IServiceCollection AddDxpEnvironmentIndicator(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -20,14 +18,16 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IStartupFilter, EnvIndicatorStartupFilter>();
 
-        // Register the protected module so /EPiServer/DxpEnvironmentIndicator/* routes resolve.
-        services.Configure<ProtectedModuleOptions>(opts =>
-        {
-            if (!opts.Items.Any(x => string.Equals(x.Name, "DxpEnvironmentIndicator", StringComparison.OrdinalIgnoreCase)))
-            {
-                opts.Items.Add(new ModuleDetails { Name = "DxpEnvironmentIndicator" });
-            }
-        });
+        // The module is discovered automatically by the Optimizely module finder scanning
+        // ~/modules/_protected/DxpEnvironmentIndicator/module.config in the host app.
+        // No manual ProtectedModuleOptions registration is needed — and adding one causes the
+        // module finder to look in ~/Optimizely/{Name} (the virtual path) instead of the correct
+        // physical ~/modules/_protected/{Name} path, producing the "couldn't find directory" error.
+
+        // Register via DI for all CMS versions.  The [MenuProvider] attribute has been removed from
+        // the provider class because CMS 12 both attribute-scans and resolves IMenuProvider from DI,
+        // causing duplicate menu entries when both mechanisms are active.
+        services.AddTransient<IMenuProvider, EnvironmentIndicatorMenuProvider>();
 
         return services;
     }

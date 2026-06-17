@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>MP.DxpEnvironmentIndicator</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Authors>Matt Pallatt</Authors>
-    <Description>An Optimizely CMS 12 add-in that badges the current DXP environment (Integration / Preproduction / Production) into the shell's top navigation bar, so editors always know which environment they are working in. The environment is matched from the request host against a small DDS-backed admin page — no per-environment code or config files.</Description>
+    <Description>An Optimizely CMS 12/13 add-in that badges the current DXP environment (Integration / Preproduction / Production) into the shell top navigation bar, so editors always know which environment they are working in. Includes a settings page accessible from Admin → Tools (CMS 12) or Add-ons (CMS 13).</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
@@ -16,8 +16,24 @@
     <None Include="../../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <!-- Module files deployed to the consuming host's modules/_protected/ folder by NuGet.
+       The module.config registers the add-in with the Optimizely shell module finder;
+       ClientResources/init.js is the AMD stub that puts the module in the shell's JS registry
+       so URLs under /Optimizely/DxpEnvironmentIndicator/ are loaded within the shell canvas. -->
   <ItemGroup>
-    <PackageReference Include="EPiServer.CMS.Core" Version="[12.0.0, 13.0.0)" />
-    <PackageReference Include="EPiServer.CMS.UI.Core" Version="[12.0.0, 13.0.0)" />
+    <Content Update="modules\_protected\DxpEnvironmentIndicator\module.config"
+             Pack="true"
+             PackagePath="content\any\any\modules\_protected\DxpEnvironmentIndicator\module.config" />
+    <Content Update="modules\_protected\DxpEnvironmentIndicator\ClientResources\init.js"
+             Pack="true"
+             PackagePath="content\any\any\modules\_protected\DxpEnvironmentIndicator\ClientResources\init.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PrivateAssets="All" keeps these out of the consumer's dependency graph.
+         CMS 12 hosts (net8.0) already have EPiServer 12.x; CMS 13 hosts (net10.0) provide
+         EPiServer 13.x at runtime. The library's public API usage is compatible across both. -->
+    <PackageReference Include="EPiServer.CMS.Core" Version="[12.0.0, 14.0.0)" PrivateAssets="All" />
+    <PackageReference Include="EPiServer.CMS.UI.Core" Version="[12.0.0, 14.0.0)" PrivateAssets="All" />
   </ItemGroup>
 </Project>

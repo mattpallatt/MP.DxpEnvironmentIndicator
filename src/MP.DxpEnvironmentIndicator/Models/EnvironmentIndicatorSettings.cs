@@ -13,37 +13,45 @@ public class EnvironmentIndicatorSettings : IDynamicData
 {
     public Identity Id { get; set; }
 
+    // BaseUrl fields store one URL per line (newline-separated) to support multiple hostnames
+    // per environment (e.g. localhost + staging alias). DetectByHost splits on newlines.
     public string IntegrationBaseUrl { get; set; }
     public string IntegrationColor { get; set; }
     public string IntegrationLabel { get; set; }
+    public bool IntegrationDisabled { get; set; } = false;
 
     public string PreproductionBaseUrl { get; set; }
     public string PreproductionColor { get; set; }
     public string PreproductionLabel { get; set; }
+    public bool PreproductionDisabled { get; set; } = false;
 
     public string ProductionBaseUrl { get; set; }
     public string ProductionColor { get; set; }
     public string ProductionLabel { get; set; }
+    public bool ProductionDisabled { get; set; } = false;
 
-    // Whether to badge Production too. On by default; untick on the settings page to leave production
-    // unbadged (so a missing badge becomes the "you're on prod" signal).
+    // Legacy opt-out flag kept for DDS backward compatibility. New UI uses ProductionDisabled.
+    // The resolver treats production as disabled when either this is false OR ProductionDisabled is true.
     public bool ShowOnProduction { get; set; } = true;
 
-    // Optional override for the CSS selector the badge is placed next to. Blank uses the built-in
-    // default; an admin can change it here if a CMS update moves the top-bar label (advanced).
+    // Optional override for the CSS selector the badge is placed next to.
     public string Selector { get; set; }
 
     // Returns the environment whose configured BaseUrl host matches the request host, or default
-    // ((null, null, null)) when nothing matches. Host-only comparison, so port/scheme don't matter.
+    // when nothing matches. Each BaseUrl may contain multiple fully-qualified URLs, one per line.
     public (string Name, string BaseUrl, string Color, string Label) DetectByHost(string host)
     {
         if (string.IsNullOrWhiteSpace(host)) return default;
         foreach (var env in All())
         {
             if (string.IsNullOrWhiteSpace(env.BaseUrl)) continue;
-            if (Uri.TryCreate(env.BaseUrl, UriKind.Absolute, out var uri) &&
-                string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase))
-                return env;
+            var urls = env.BaseUrl.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var url in urls)
+            {
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                    string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase))
+                    return env;
+            }
         }
         return default;
     }

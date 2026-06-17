@@ -25,8 +25,16 @@ public class EnvironmentResolver : IEnvironmentResolver
 
         if (match.Name != null)
         {
-            if (string.Equals(match.Name, "Production", StringComparison.OrdinalIgnoreCase) && !settings.ShowOnProduction)
-                return null;
+            bool disabled = match.Name switch
+            {
+                "Integration" => settings.IntegrationDisabled,
+                "Preproduction" => settings.PreproductionDisabled,
+                // Legacy ShowOnProduction=false is treated as disabled; new ProductionDisabled takes precedence.
+                "Production" => settings.ProductionDisabled || !settings.ShowOnProduction,
+                _ => false
+            };
+
+            if (disabled) return null;
 
             var color = string.IsNullOrWhiteSpace(match.Color) ? DefaultColor(match.Name) : match.Color;
             return color == null ? null : new ResolvedEnvironment(match.Name, EffectiveLabel(match.Name, match.Label), color);
