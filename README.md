@@ -2,28 +2,7 @@
 
 An Optimizely CMS 12 add-in that badges the current DXP environment into the shell's top
 navigation bar, so editors always know whether they're on **Integration**, **Preproduction**, or
-**Production**. Integration shows orange, Preproduction purple, and Production red. All three are
-badged by default; you can turn the Production badge off so a missing badge becomes the "you're on
-prod" signal.
-
-It is fully standalone — it has **no dependency** on any other add-in.
-
-![CMS [INTEGRATION] badge in the top bar](#)
-
-## How it knows the environment
-
-There's no per-environment config file or build variable to maintain. The running site identifies
-itself by **matching the browser's request host** against the Base URLs you enter on a small admin
-page (stored in the Dynamic Data Store). The same settings can be saved on every environment and
-each one badges itself correctly.
-
-Host-matching is deliberate: a stored "this is Integration" flag could be silently overwritten when
-DXP copies database content from one environment to another, whereas the live request host can't be.
-Only the host part of each URL is compared — port and scheme are ignored — so `https://localhost:5000`
-matches a `https://localhost:5000` Base URL during local development.
-
-If the request host matches nothing, the indicator falls back to `ASPNETCORE_ENVIRONMENT`: a
-`Development` host shows a green **DEVELOPMENT** badge; anything else stays silent.
+**Production**. 
 
 ## Install
 
@@ -48,19 +27,6 @@ If the request host matches nothing, the indicator falls back to `ASPNETCORE_ENV
 | Badge **colour** | The pill background colour for that environment. Text colour (dark/white) is chosen automatically for contrast. |
 | **Show a badge on Production** | On by default. Untick to leave production unbadged. |
 | **Advanced → Top-bar selector** | Optional CSS-selector override for where the badge is placed, in case a CMS update moves the label. Blank uses the built-in default. |
-
-## How it works (internals)
-
-- `EnvironmentClientResourceController` serves two scripts from controller routes (so there's no
-  static-asset folder to deploy): `EnvIndicator.js` (the badge) and `AdminInit.js` (the settings
-  overlay).
-- `EnvIndicatorMiddleware` injects the badge script into shell HTML pages; `AdminScriptMiddleware`
-  injects the settings overlay into admin pages. Both are registered automatically via
-  `EnvIndicatorStartupFilter` and share `HtmlBodyInjector`.
-- `EnvironmentResolver` resolves the badge server-side (host-match → `ASPNETCORE_ENVIRONMENT`
-  fallback) and the colour/name are baked into `EnvIndicator.js` per request.
-- The badge script finds the product label in the top bar and appends a coloured pill, retrying via
-  a `MutationObserver` until the (async) shell renders.
 
 ## Build
 
