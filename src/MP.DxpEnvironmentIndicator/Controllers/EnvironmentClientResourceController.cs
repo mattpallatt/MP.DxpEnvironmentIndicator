@@ -23,6 +23,30 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     public IActionResult AdminInit() =>
         Content(AdminInitScript, "application/javascript; charset=utf-8");
 
+    // CMS 13 Add-ons iframe entry point.  The shell's module router iframes this physical-style URL
+    // (it's under our registered module prefix); the page immediately redirects the iframe to the
+    // actual Razor settings controller so no server-rendered content lives in a static file.
+    [HttpGet]
+    [Route("~/Optimizely/DxpEnvironmentIndicator/settings.html")]
+    [ResponseCache(Duration = 0, NoStore = true)]
+    public IActionResult SettingsEntry() => Content("""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Enviro-helper</title></head>
+        <body style="margin:0">
+        <script>window.location.replace('/EPiServer/DxpEnvironmentIndicator/settings');</script>
+        </body>
+        </html>
+        """, "text/html; charset=utf-8");
+
+    // Stub AMD module served at the module's ClientResources path.  Satisfies any runtime
+    // resource checks the shell performs after the module is registered.
+    [HttpGet]
+    [Route("~/Optimizely/DxpEnvironmentIndicator/ClientResources/init.js")]
+    [ResponseCache(Duration = 3600)]
+    public IActionResult ModuleInit() =>
+        Content("// Enviro-helper module init", "application/javascript; charset=utf-8");
+
     // Resolves the environment server-side from the request host and bakes the name, background and
     // (accessibility-aware) text colour, and selector into the script — no client-side fetch and no
     // response cache, so a colour or selector change takes effect on the next load. When nothing
@@ -46,81 +70,90 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
         return Content(prelude + EnvIndicatorScript, "application/javascript; charset=utf-8");
     }
 
-    // Injects a "DXP Environment Indicator" link directly into the CMS 13 admin SPA sidebar.
-    // The SPA (React) has hardcoded navigation so [MenuProvider] cannot add to it; we clone
-    // an existing link's style and inject ours pointing straight at the standalone settings page.
-    // A MutationObserver retries for 30 s in case the SPA re-renders and removes our link.
+    // CMS 12 only. Watches location.hash; when it matches our route it overlays a fixed-position
+    // iframe of the settings page over the admin content pane (right of the sidebar nav, so the
+    // shell chrome stays visible), then hides it again when the hash changes away. This keeps the
+    // admin SPA in the browser history so the shell nav remains present throughout.
     private const string AdminInitScript = """
     (function () {
-        var SETTINGS_URL = '/EPiServer/DxpEnvironmentIndicator/Admin/Settings';
-        var LINK_ID = 'dxp-env-settings-nav-link';
-        var linkObserver = null;
+        var ROUTE = '#/EnvIndicator/Settings';
+        var FRAME_ID = 'dxp-env-settings-frame';
+        var SETTINGS_URL = '/EPiServer/DxpEnvironmentIndicator/settings';
+        var NAV_SELECTOR = '.epi-side-bar-navigation';
+        var CONTENT_SELECTOR = '.content-area-container';
+        var trackTimer = null;
 
-        function injectNavLink() {
-            if (document.getElementById(LINK_ID)) return true;
-
-            var existingLink = null;
-            var links = document.querySelectorAll('a[href]');
-            for (var i = 0; i < links.length; i++) {
-                var h = links[i].getAttribute('href') || '';
-                if (h.indexOf('#/') === 0 || h.indexOf('default#/') >= 0) {
-                    existingLink = links[i];
-                    break;
-                }
-            }
-            if (!existingLink) return false;
-
-            var container = existingLink.parentElement;
-            while (container && container !== document.body) {
-                var tag = container.tagName.toLowerCase();
-                if (tag === 'ul' || tag === 'ol' || tag === 'nav' ||
-                    container.getAttribute('role') === 'navigation') break;
-                container = container.parentElement;
-            }
-            if (!container || container === document.body) return false;
-
-            var cloneItem = existingLink.closest('li') || existingLink;
-            var newItem = cloneItem.cloneNode(false);
-            if (cloneItem.tagName.toLowerCase() === 'li') {
-                var a = document.createElement('a');
-                a.id = LINK_ID;
-                a.href = SETTINGS_URL;
-                a.className = existingLink.className;
-                a.setAttribute('aria-current', 'false');
-                a.textContent = 'DXP Environment Indicator';
-                newItem.appendChild(a);
-            } else {
-                newItem.id = LINK_ID;
-                newItem.href = SETTINGS_URL;
-                newItem.textContent = 'DXP Environment Indicator';
-            }
-            container.appendChild(newItem);
-            return true;
+        function topOffset() {
+            var nav = document.querySelector(
+                '.epi-navigation, #epi-shellHeader, [class*="shellHeader"], header[role="banner"]');
+            var b = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+            return b > 0 ? b : 48;
         }
 
-        function startObserver() {
-            if (linkObserver) return;
-            linkObserver = new MutationObserver(function () {
-                if (!document.getElementById(LINK_ID)) injectNavLink();
-            });
-            linkObserver.observe(document.body, { childList: true, subtree: true });
-            setTimeout(function () {
-                if (linkObserver) { linkObserver.disconnect(); linkObserver = null; }
-            }, 30000);
+        function rectOf(sel, minW, minH) {
+            var el = document.querySelector(sel);
+            if (el) { var r = el.getBoundingClientRect(); if (r.width > minW && r.height > minH) return r; }
+            return null;
         }
 
-        function init() {
-            if (!injectNavLink()) startObserver();
+        function applyGeometry(frame) {
+            var nav = rectOf(NAV_SELECTOR, 100, 100);
+            if (nav) {
+                frame.style.top    = nav.top + 'px';
+                frame.style.left   = nav.right + 'px';
+                frame.style.width  = Math.max(0, window.innerWidth - nav.right) + 'px';
+                frame.style.height = nav.height + 'px';
+                return;
+            }
+            var c = rectOf(CONTENT_SELECTOR, 100, 100);
+            if (c) {
+                frame.style.top = c.top + 'px'; frame.style.left = c.left + 'px';
+                frame.style.width = c.width + 'px'; frame.style.height = c.height + 'px';
+                return;
+            }
+            var t = topOffset();
+            frame.style.top = t + 'px'; frame.style.left = '0';
+            frame.style.width = '100vw'; frame.style.height = 'calc(100vh - ' + t + 'px)';
         }
 
-        if (document.readyState === 'loading')
-            document.addEventListener('DOMContentLoaded', init);
-        else
-            init();
+        function showFrame() {
+            var frame = document.getElementById(FRAME_ID);
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id    = FRAME_ID;
+                frame.src   = SETTINGS_URL;
+                frame.title = 'Enviro-helper Settings';
+                frame.style.cssText = 'position:fixed;border:0;z-index:2147483000;background:#fff;';
+                document.body.appendChild(frame);
+            }
+            applyGeometry(frame);
+            frame.style.display = 'block';
+            if (!trackTimer) trackTimer = setInterval(function () {
+                var f = document.getElementById(FRAME_ID);
+                if (f && f.style.display !== 'none') applyGeometry(f);
+            }, 300);
+        }
 
-        [250, 750, 1500].forEach(function (ms) {
-            setTimeout(function () { if (!document.getElementById(LINK_ID)) injectNavLink(); }, ms);
+        function hideFrame() {
+            var frame = document.getElementById(FRAME_ID);
+            if (frame) frame.style.display = 'none';
+            if (trackTimer) { clearInterval(trackTimer); trackTimer = null; }
+        }
+
+        function sync() {
+            if ((location.hash || '').indexOf(ROUTE) === 0) showFrame(); else hideFrame();
+        }
+
+        window.addEventListener('hashchange', sync);
+        window.addEventListener('resize', function () {
+            var f = document.getElementById(FRAME_ID);
+            if (f && f.style.display !== 'none') applyGeometry(f);
         });
+
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync);
+        else sync();
+
+        [250, 750, 1500].forEach(function (ms) { setTimeout(sync, ms); });
     })();
     """;
 
@@ -202,13 +235,8 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
             badge.style.cssText =
                 'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
                 ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;' +
-                'letter-spacing:0.5px;margin-left:8px;flex-shrink:0;white-space:nowrap;cursor:pointer;' +
+                'letter-spacing:0.5px;margin-left:8px;flex-shrink:0;white-space:nowrap;' +
                 'vertical-align:middle;';
-            badge.title = 'DXP Environment Indicator — click to open settings';
-            badge.onclick = function (e) {
-                e.stopPropagation();
-                window.location = '/EPiServer/DxpEnvironmentIndicator/Admin/Settings';
-            };
             host.insertAdjacentElement('afterend', badge);
             return true;
         }

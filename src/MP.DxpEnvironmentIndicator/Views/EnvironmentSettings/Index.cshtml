@@ -7,7 +7,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>DXP Environment Indicator — Settings</title>
+    <title>Enviro-helper</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" />
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -23,25 +23,28 @@
         .env { border: 1px solid #e3e3e3; border-radius: 6px; padding: 16px 18px; margin-bottom: 16px; max-width: 720px; }
         .env h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
         label { display: block; font-size: 13px; font-weight: 500; color: #333; margin: 0 0 4px; }
-        inpstut[type=text] {
+        input[type=text] {
             width: 100%; max-width: 480px; padding: 7px 9px; border: 1px solid #bbb; border-radius: 3px;
             font-size: 14px; margin-bottom: 12px; background: #fff; color: #1a1a1a;
         }
-        input[type=text]:focus, input[type=color]:focus { outline: none; border-color: #2973c3; box-shadow: 0 0 0 2px rgba(41,115,195,0.2); }
-        
+        textarea {
+            width: 100%; max-width: 480px; padding: 7px 9px; border: 1px solid #bbb; border-radius: 3px;
+            font-size: 14px; margin-bottom: 4px; background: #fff; color: #1a1a1a;
+            font-family: inherit; resize: vertical; display: block;
+        }
+        input[type=text]:focus, input[type=color]:focus, textarea:focus {
+            outline: none; border-color: #2973c3; box-shadow: 0 0 0 2px rgba(41,115,195,0.2);
+        }
         .color-row { display: flex; align-items: center; gap: 10px; }
         input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; }
         .color-hint { color: #777; font-size: 12px; }
-        .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 22px; max-width: 720px; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; max-width: 720px; }
         .checkbox-row label { margin: 0; font-weight: 400; }
-        button, .btn-back {
+        button {
             display: inline-block; padding: 9px 18px; font-size: 14px; font-weight: 500; cursor: pointer;
-            border-radius: 3px; text-decoration: none;
+            border-radius: 3px; text-decoration: none; background: #2973c3; color: #fff; border: none;
         }
-        button { background: #2973c3; color: #fff; border: none; }
         button:hover { background: #1f5ea3; }
-        .btn-back { background: #fff; color: #333; border: 1px solid #bbb; margin-left: 10px; }
-        .btn-back:hover { background: #f5f5f5; border-color: #999; }
         .saved { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
         .error { background: #fdecea; color: #b71c1c; border: 1px solid #ef9a9a; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
         details.advanced { max-width: 720px; margin: 0 0 22px; border: 1px solid #e3e3e3; border-radius: 6px; }
@@ -50,13 +53,14 @@
         details.advanced > summary::before { content: '\25B8'; display: inline-block; margin-right: 8px; color: #888; transition: transform 0.15s; }
         details.advanced[open] > summary::before { transform: rotate(90deg); }
         .advanced-body { padding: 0 16px 16px; }
-        .help { color: #777; font-size: 12px; margin: 0 0 8px; max-width: 640px; }
+        .help { color: #777; font-size: 12px; margin: 0 0 12px; max-width: 640px; }
         code { background: #f3f4f6; border: 1px solid #e3e3e3; border-radius: 3px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
-        input[type=submit] {height: 40px;}
+        input[type=submit] { height: 40px; }
+        .env-disabled { opacity: 0.5; }
     </style>
-</head> 
+</head>
 <body>
-    <h1>DXP Environment Indicator</h1>
+    <h1>Enviro-helper</h1>
     <p class="sub">Badge the current DXP environment into the CMS top bar so editors always know where they are.</p>
 
     @if (Model.Saved)
@@ -69,61 +73,74 @@
     }
 
     <div class="intro">
-        <p><strong>How it works:</strong> enter the <em>Base URL</em> of each environment. The running site identifies
+        <p><strong>How it works:</strong> enter the <em>Base URLs</em> for each environment. The running site identifies
         itself by matching the browser's request host against these URLs — so the same settings can be saved on every
         environment, and each one badges itself correctly.</p>
         <p>Host-matching is used (rather than a stored "this is X" flag) because it can't be clobbered when DXP copies
         database content between environments. Only the host part of each URL is compared; port and scheme are ignored.</p>
     </div>
 
-    <form method="post" action="/EPiServer/DxpEnvironmentIndicator/Admin/Settings">
+    <form method="post" action="@Context.Request.Path">
         @Html.AntiForgeryToken()
 
         <div class="env">
             <h2>Integration</h2>
-            <label for="i-url">Base URL</label>
-            <input type="text" id="i-url" name="IntegrationBaseUrl" value="@Model.IntegrationBaseUrl" placeholder="https://your-inte-slot.dxcloud.episerver.net" />
+            <label for="i-url">Base URLs</label>
+            <textarea id="i-url" name="IntegrationBaseUrl" rows="3"
+                placeholder="https://your-inte-slot.dxcloud.episerver.net">@Model.IntegrationBaseUrl</textarea>
+            <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
             <label for="i-label">Environment label</label>
-            <input type="text" id="i-label" name="IntegrationLabel" value="@Model.IntegrationLabel" placeholder="INTEGRATION" maxlength="24" />
+            <input type="text" id="i-label" name="IntegrationLabel" value="@Model.IntegrationLabel" placeholder="integration" maxlength="24" />
             <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="IntegrationColor" value="@(Model.IntegrationColor ?? "#d4651a")" />
-                <span class="color-hint">Shown as the pill background.</span>
+                <span class="color-hint">Shown as indicator background.</span>
+            </div>
+            <div class="checkbox-row">
+                <input type="checkbox" id="disable-integration" name="IntegrationDisabled" value="true" @(Model.IntegrationDisabled ? "checked" : "") />
+                <label for="disable-integration">Disable indicator in this environment</label>
             </div>
         </div>
 
         <div class="env">
             <h2>Preproduction</h2>
-            <label for="p-url">Base URL</label>
-            <input type="text" id="p-url" name="PreproductionBaseUrl" value="@Model.PreproductionBaseUrl" placeholder="https://your-prep-slot.dxcloud.episerver.net" />
+            <label for="p-url">Base URLs</label>
+            <textarea id="p-url" name="PreproductionBaseUrl" rows="3"
+                placeholder="https://your-prep-slot.dxcloud.episerver.net">@Model.PreproductionBaseUrl</textarea>
+            <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
             <label for="p-label">Environment label</label>
-            <input type="text" id="p-label" name="PreproductionLabel" value="@Model.PreproductionLabel" placeholder="PREPRODUCTION" maxlength="24" />
+            <input type="text" id="p-label" name="PreproductionLabel" value="@Model.PreproductionLabel" placeholder="preproduction" maxlength="24" />
             <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="PreproductionColor" value="@(Model.PreproductionColor ?? "#7b2fff")" />
-                <span class="color-hint">Shown as the pill background.</span>
+                <span class="color-hint">Shown as indicator background.</span>
+            </div>
+            <div class="checkbox-row">
+                <input type="checkbox" id="disable-preproduction" name="PreproductionDisabled" value="true" @(Model.PreproductionDisabled ? "checked" : "") />
+                <label for="disable-preproduction">Disable indicator in this environment</label>
             </div>
         </div>
 
         <div class="env">
             <h2>Production</h2>
-            <label for="pr-url">Base URL</label>
-            <input type="text" id="pr-url" name="ProductionBaseUrl" value="@Model.ProductionBaseUrl" placeholder="https://www.example.com" />
+            <label for="pr-url">Base URLs</label>
+            <textarea id="pr-url" name="ProductionBaseUrl" rows="3"
+                placeholder="https://www.example.com">@Model.ProductionBaseUrl</textarea>
+            <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
             <label for="pr-label">Environment label</label>
-            <input type="text" id="pr-label" name="ProductionLabel" value="@Model.ProductionLabel" placeholder="PRODUCTION" maxlength="24" />
+            <input type="text" id="pr-label" name="ProductionLabel" value="@Model.ProductionLabel" placeholder="production" maxlength="24" />
             <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
             <label>Badge colour</label>
             <div class="color-row">
                 <input type="color" name="ProductionColor" value="@(Model.ProductionColor ?? "#c0392b")" />
-                <span class="color-hint">Shown as the pill background (unless production is unticked below).</span>
+                <span class="color-hint">Shown as indicator background.</span>
             </div>
-        </div>
-
-        <div class="checkbox-row">
-            <input type="checkbox" id="showprod" name="ShowOnProduction" value="true" @(Model.ShowOnProduction ? "checked" : "") />
-            <label for="showprod">Show a badge on Production (on by default — untick to leave production unbadged)</label>
+            <div class="checkbox-row">
+                <input type="checkbox" id="disable-production" name="ProductionDisabled" value="true" @(Model.ProductionDisabled ? "checked" : "") />
+                <label for="disable-production">Disable indicator in this environment</label>
+            </div>
         </div>
 
         <details class="advanced" @(string.IsNullOrWhiteSpace(Model.Selector) ? "" : "open")>
@@ -141,8 +158,6 @@
             </div>
         </details>
 
-       
-        <a class="btn-back" href="/Optimizely/Settings/default">← Back to Admin</a>
         <button type="submit">Save Settings</button>
     </form>
 

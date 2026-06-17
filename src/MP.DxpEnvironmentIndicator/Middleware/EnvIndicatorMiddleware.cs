@@ -15,7 +15,7 @@ public class EnvIndicatorMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!IsShellPageRequest(context))
+        if (context.WebSockets.IsWebSocketRequest || !IsShellPageRequest(context))
         {
             await next(context);
             return;
