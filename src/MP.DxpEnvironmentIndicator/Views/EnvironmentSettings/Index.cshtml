@@ -38,6 +38,11 @@
         .color-row { display: flex; align-items: center; gap: 10px; }
         input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; }
         .color-hint { color: #777; font-size: 12px; }
+        .badge-preview {
+            display: inline-flex; align-items: center; height: 22px; padding: 0 8px;
+            border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+            white-space: nowrap; color: #fff; background: #888; margin-left: 4px;
+        }
         .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; max-width: 720px; }
         .checkbox-row label { margin: 0; font-weight: 400; }
         button {
@@ -96,6 +101,7 @@
             <div class="color-row">
                 <input type="color" name="IntegrationColor" value="@(Model.IntegrationColor ?? "#d4651a")" />
                 <span class="color-hint">Shown as indicator background.</span>
+                <span class="badge-preview" id="i-preview">INTEGRATION</span>
             </div>
             <div class="checkbox-row">
                 <input type="checkbox" id="disable-integration" name="IntegrationDisabled" value="true" @(Model.IntegrationDisabled ? "checked" : "") />
@@ -116,6 +122,7 @@
             <div class="color-row">
                 <input type="color" name="PreproductionColor" value="@(Model.PreproductionColor ?? "#7b2fff")" />
                 <span class="color-hint">Shown as indicator background.</span>
+                <span class="badge-preview" id="p-preview">PREPRODUCTION</span>
             </div>
             <div class="checkbox-row">
                 <input type="checkbox" id="disable-preproduction" name="PreproductionDisabled" value="true" @(Model.PreproductionDisabled ? "checked" : "") />
@@ -136,6 +143,7 @@
             <div class="color-row">
                 <input type="color" name="ProductionColor" value="@(Model.ProductionColor ?? "#c0392b")" />
                 <span class="color-hint">Shown as indicator background.</span>
+                <span class="badge-preview" id="pr-preview">PRODUCTION</span>
             </div>
             <div class="checkbox-row">
                 <input type="checkbox" id="disable-production" name="ProductionDisabled" value="true" @(Model.ProductionDisabled ? "checked" : "") />
@@ -160,6 +168,45 @@
 
         <button type="submit">Save Settings</button>
     </form>
+
+    <script>
+        // Live preview of each environment's badge: updates as the colour/label change, with the same
+        // WCAG-contrast text colour the server bakes into the real badge (luminance crossover 0.179).
+        (function () {
+            function contrastText(hex) {
+                var m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((hex || '').trim());
+                if (!m) return '#ffffff';
+                var h = m[1];
+                if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+                function lin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+                var L = 0.2126 * lin(parseInt(h.substr(0, 2), 16))
+                      + 0.7152 * lin(parseInt(h.substr(2, 2), 16))
+                      + 0.0722 * lin(parseInt(h.substr(4, 2), 16));
+                return L > 0.179 ? '#1a1a1a' : '#ffffff';
+            }
+
+            var envs = [
+                { labelId: 'i-label',  colorName: 'IntegrationColor',   previewId: 'i-preview',  def: 'INTEGRATION' },
+                { labelId: 'p-label',  colorName: 'PreproductionColor', previewId: 'p-preview',  def: 'PREPRODUCTION' },
+                { labelId: 'pr-label', colorName: 'ProductionColor',    previewId: 'pr-preview', def: 'PRODUCTION' }
+            ];
+
+            envs.forEach(function (e) {
+                var labelEl = document.getElementById(e.labelId);
+                var colorEl = document.querySelector('[name="' + e.colorName + '"]');
+                var pill = document.getElementById(e.previewId);
+                if (!pill || !colorEl) return;
+                function update() {
+                    pill.textContent = (labelEl && labelEl.value.trim()) || e.def;
+                    pill.style.background = colorEl.value;
+                    pill.style.color = contrastText(colorEl.value);
+                }
+                if (labelEl) labelEl.addEventListener('input', update);
+                colorEl.addEventListener('input', update);
+                update();
+            });
+        })();
+    </script>
 
 </body>
 </html>

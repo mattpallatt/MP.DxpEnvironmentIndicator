@@ -8,7 +8,11 @@ namespace MP.DxpEnvironmentIndicator.Controllers;
 // Serves the two client-side scripts the shell needs — the admin settings overlay bootstrap and the
 // top-bar environment badge. Served from a controller (rather than packaged static assets) so the
 // class library is self-contained — there is no host-side ClientResources folder to deploy.
-[AllowAnonymous]
+//
+// Requires an authenticated user (not a specific role): both scripts are only ever loaded inside the
+// already-authenticated CMS shell, so the auth cookie rides along — while keeping EnvIndicator.js
+// (which names the environment) off any anonymous, bot-discoverable endpoint.
+[Authorize]
 public class EnvironmentClientResourceController(IEnvironmentResolver resolver, IEnvironmentSettingsService settings) : Controller
 {
     // The CSS selector for the top-bar label the badge is placed next to. Overridable from the
@@ -161,10 +165,13 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     // navigation bar and inserts a coloured environment pill next to it. Tries the configured selector
     // first, then a chain of known selectors for CMS 12 and CMS 13, then a text-content fallback that
     // finds any nav button whose visible text is exactly "CMS". The badge is idempotent via the
-    // .dxp-env-badge marker. The OPN renders asynchronously so a MutationObserver retries for 15 s.
+    // .dxp-env-badge marker. The OPN renders asynchronously, so placement runs on a light periodic
+    // poll (cheap once badged — a single querySelector early-out) rather than a subtree MutationObserver
+    // reacting to every shell mutation; polling for the session also lets the badge self-heal if the
+    // CMS re-renders the top bar and strips our node.
     private const string EnvIndicatorScript = """
     (function () {
-        var deadline = Date.now() + 15000;
+        var POLL_MS = 500;
         var BADGE_CLASS = 'dxp-env-badge';
 
         var SELECTORS = [
@@ -221,6 +228,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
         }
 
         function apply() {
+            if (document.querySelector('.' + BADGE_CLASS)) return true;
             var label = findLabel();
             if (!label) return false;
             var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') ||
@@ -241,19 +249,8 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
             return true;
         }
 
-        function start() {
-            if (apply()) return;
-            var obs = new MutationObserver(function () {
-                if (apply() || Date.now() > deadline) obs.disconnect();
-            });
-            obs.observe(document.body, { childList: true, subtree: true, characterData: true });
-            setTimeout(function () { obs.disconnect(); }, 15000);
-        }
-
-        if (document.readyState === 'loading')
-            document.addEventListener('DOMContentLoaded', start);
-        else
-            start();
+        apply();
+        setInterval(apply, POLL_MS);
     })();
     """;
 }
