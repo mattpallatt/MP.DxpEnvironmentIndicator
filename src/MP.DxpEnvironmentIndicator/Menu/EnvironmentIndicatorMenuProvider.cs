@@ -15,7 +15,7 @@ public class EnvironmentIndicatorMenuProvider : IMenuProvider
             new UrlMenuItem(
                 "DXP Environment Indicator",
                 "/global/cms/admin/tools/dxp.envindicator",
-                "/EPiServer/EPiServer.Cms.UI.Admin/default#/EnvIndicator/Settings")
+                "/EPiServer/DxpEnvironmentIndicator/Admin/Settings")
             {
                 IsAvailable = _ => true,
                 SortIndex = SortIndex.Last + 1

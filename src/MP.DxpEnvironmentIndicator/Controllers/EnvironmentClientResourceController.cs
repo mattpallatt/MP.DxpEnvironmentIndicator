@@ -13,11 +13,13 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
 {
     // The CSS selector for the top-bar label the badge is placed next to. Overridable from the
     // settings page (advanced) in case a CMS update moves it; this is the built-in fallback.
-    public const string DefaultSelector = ".epi-pn-navigation__section--align-center .flex--1.truncate";
+    // Targets .flex--1.truncate anywhere inside the OPN web component — does not assume a specific
+    // section alignment class, which differs between CMS 12 and CMS 13.
+    public const string DefaultSelector = "epi-pn-navigation .flex--1.truncate";
 
     [HttpGet]
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/AdminInit.js")]
-    [ResponseCache(Duration = 300)]
+    [ResponseCache(Duration = 60)]
     public IActionResult AdminInit() =>
         Content(AdminInitScript, "application/javascript; charset=utf-8");
 
@@ -44,125 +46,169 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
         return Content(prelude + EnvIndicatorScript, "application/javascript; charset=utf-8");
     }
 
-    // Watches location.hash; when it matches our route, overlays an iframe of the standalone settings
-    // page over the admin content pane (anchored to the right of the side-bar nav, which is present on
-    // every admin route including ours) and hides it again on navigation elsewhere.
+    // Injects a "DXP Environment Indicator" link directly into the CMS 13 admin SPA sidebar.
+    // The SPA (React) has hardcoded navigation so [MenuProvider] cannot add to it; we clone
+    // an existing link's style and inject ours pointing straight at the standalone settings page.
+    // A MutationObserver retries for 30 s in case the SPA re-renders and removes our link.
     private const string AdminInitScript = """
     (function () {
-        var ROUTE = '#/EnvIndicator/Settings';
-        var FRAME_ID = 'dxp-env-settings-frame';
         var SETTINGS_URL = '/EPiServer/DxpEnvironmentIndicator/Admin/Settings';
-        var NAV_SELECTOR = '.epi-side-bar-navigation';
-        var CONTENT_SELECTOR = '.content-area-container';
-        var trackTimer = null;
+        var LINK_ID = 'dxp-env-settings-nav-link';
+        var linkObserver = null;
 
-        function topOffset() {
-            var nav = document.querySelector(
-                '.epi-navigation, #epi-shellHeader, [class*="shellHeader"], [class*="GlobalNavigation"], header[role="banner"]');
-            var bottom = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
-            return bottom > 0 ? bottom : 48;
+        function injectNavLink() {
+            if (document.getElementById(LINK_ID)) return true;
+
+            var existingLink = null;
+            var links = document.querySelectorAll('a[href]');
+            for (var i = 0; i < links.length; i++) {
+                var h = links[i].getAttribute('href') || '';
+                if (h.indexOf('#/') === 0 || h.indexOf('default#/') >= 0) {
+                    existingLink = links[i];
+                    break;
+                }
+            }
+            if (!existingLink) return false;
+
+            var container = existingLink.parentElement;
+            while (container && container !== document.body) {
+                var tag = container.tagName.toLowerCase();
+                if (tag === 'ul' || tag === 'ol' || tag === 'nav' ||
+                    container.getAttribute('role') === 'navigation') break;
+                container = container.parentElement;
+            }
+            if (!container || container === document.body) return false;
+
+            var cloneItem = existingLink.closest('li') || existingLink;
+            var newItem = cloneItem.cloneNode(false);
+            if (cloneItem.tagName.toLowerCase() === 'li') {
+                var a = document.createElement('a');
+                a.id = LINK_ID;
+                a.href = SETTINGS_URL;
+                a.className = existingLink.className;
+                a.setAttribute('aria-current', 'false');
+                a.textContent = 'DXP Environment Indicator';
+                newItem.appendChild(a);
+            } else {
+                newItem.id = LINK_ID;
+                newItem.href = SETTINGS_URL;
+                newItem.textContent = 'DXP Environment Indicator';
+            }
+            container.appendChild(newItem);
+            return true;
         }
 
-        function rectOf(selector, minW, minH) {
-            var el = document.querySelector(selector);
-            if (el) {
-                var r = el.getBoundingClientRect();
-                if (r.width > minW && r.height > minH) return r;
+        function startObserver() {
+            if (linkObserver) return;
+            linkObserver = new MutationObserver(function () {
+                if (!document.getElementById(LINK_ID)) injectNavLink();
+            });
+            linkObserver.observe(document.body, { childList: true, subtree: true });
+            setTimeout(function () {
+                if (linkObserver) { linkObserver.disconnect(); linkObserver = null; }
+            }, 30000);
+        }
+
+        function init() {
+            if (!injectNavLink()) startObserver();
+        }
+
+        if (document.readyState === 'loading')
+            document.addEventListener('DOMContentLoaded', init);
+        else
+            init();
+
+        [250, 750, 1500].forEach(function (ms) {
+            setTimeout(function () { if (!document.getElementById(LINK_ID)) injectNavLink(); }, ms);
+        });
+    })();
+    """;
+
+    // Reads __DXP_ENV / __DXP_COLOR from the prelude. Finds the "CMS" product label in the top OPN
+    // navigation bar and inserts a coloured environment pill next to it. Tries the configured selector
+    // first, then a chain of known selectors for CMS 12 and CMS 13, then a text-content fallback that
+    // finds any nav button whose visible text is exactly "CMS". The badge is idempotent via the
+    // .dxp-env-badge marker. The OPN renders asynchronously so a MutationObserver retries for 15 s.
+    private const string EnvIndicatorScript = """
+    (function () {
+        var deadline = Date.now() + 15000;
+        var BADGE_CLASS = 'dxp-env-badge';
+
+        var SELECTORS = [
+            __DXP_SELECTOR,                                              // "epi-pn-navigation .flex--1.truncate"
+            '.epi-pn-navigation .flex--1.truncate',                      // class-based OPN container (CMS 12/13)
+            '.epi-pn-navigation__section--align-center .flex--1.truncate',
+            '.epi-pn-navigation__section--align-start .flex--1.truncate', // CMS 13 may use --align-start
+            'epi-pn-navigation .oui-button span',
+            '.epi-pn-navigation .oui-button span',
+            '.platform-navigation-wrapper .flex--1.truncate',
+            '[class*="platform-navigation"] .truncate'
+        ];
+        var seen = {}, selectors = [];
+        for (var i = 0; i < SELECTORS.length; i++) {
+            if (SELECTORS[i] && !seen[SELECTORS[i]]) { seen[SELECTORS[i]] = 1; selectors.push(SELECTORS[i]); }
+        }
+
+        function findLabelBySelector() {
+            for (var i = 0; i < selectors.length; i++) {
+                try {
+                    var els = document.querySelectorAll(selectors[i]);
+                    for (var j = 0; j < els.length; j++) {
+                        if ((els[j].textContent || '').trim() === 'CMS') return els[j];
+                    }
+                } catch(e) {}
             }
             return null;
         }
 
-        function applyGeometry(frame) {
-            var nav = rectOf(NAV_SELECTOR, 100, 100);
-            if (nav) {
-                frame.style.top = nav.top + 'px';
-                frame.style.left = nav.right + 'px';
-                frame.style.width = Math.max(0, window.innerWidth - nav.right) + 'px';
-                frame.style.height = nav.height + 'px';
-                return;
+        // Text-content fallback: any button/span inside a nav-looking element whose text is "CMS"
+        function findLabelByText() {
+            var candidates = document.querySelectorAll(
+                'epi-pn-navigation button, epi-pn-navigation span, ' +
+                '[class*="navigation"] button, [class*="navigation"] span');
+            for (var i = 0; i < candidates.length; i++) {
+                var el = candidates[i];
+                if ((el.textContent || '').trim() === 'CMS' && el.children.length === 0) return el;
             }
-            var content = rectOf(CONTENT_SELECTOR, 100, 100);
-            if (content) {
-                frame.style.top = content.top + 'px';
-                frame.style.left = content.left + 'px';
-                frame.style.width = content.width + 'px';
-                frame.style.height = content.height + 'px';
-                return;
+            return null;
+        }
+
+        function findLabel() {
+            return findLabelBySelector() || findLabelByText();
+        }
+
+        function alreadyBadged(anchor) {
+            var p = anchor.parentElement;
+            while (p) {
+                if (p.querySelector('.' + BADGE_CLASS)) return true;
+                if (p === document.body) break;
+                p = p.parentElement;
             }
-            var t = topOffset();
-            frame.style.top = t + 'px';
-            frame.style.left = '0';
-            frame.style.width = '100vw';
-            frame.style.height = 'calc(100vh - ' + t + 'px)';
+            return false;
         }
-
-        function showFrame() {
-            var frame = document.getElementById(FRAME_ID);
-            if (!frame) {
-                frame = document.createElement('iframe');
-                frame.id = FRAME_ID;
-                frame.src = SETTINGS_URL;
-                frame.title = 'DXP Environment Indicator Settings';
-                frame.style.cssText = 'position:fixed;border:0;z-index:2147483000;background:#fff;';
-                document.body.appendChild(frame);
-            }
-            applyGeometry(frame);
-            frame.style.display = 'block';
-            if (!trackTimer) trackTimer = setInterval(function () {
-                var f = document.getElementById(FRAME_ID);
-                if (f && f.style.display !== 'none') applyGeometry(f);
-            }, 300);
-        }
-
-        function hideFrame() {
-            var frame = document.getElementById(FRAME_ID);
-            if (frame) frame.style.display = 'none';
-            if (trackTimer) { clearInterval(trackTimer); trackTimer = null; }
-        }
-
-        function sync() {
-            if ((location.hash || '').indexOf(ROUTE) === 0) showFrame();
-            else hideFrame();
-        }
-
-        window.addEventListener('hashchange', sync);
-        window.addEventListener('resize', function () {
-            var f = document.getElementById(FRAME_ID);
-            if (f && f.style.display !== 'none') applyGeometry(f);
-        });
-
-        if (document.readyState === 'loading')
-            document.addEventListener('DOMContentLoaded', sync);
-        else
-            sync();
-
-        [250, 750, 1500].forEach(function (ms) { setTimeout(sync, ms); });
-    })();
-    """;
-
-    // Reads __DXP_ENV / __DXP_COLOR from the prelude. Finds the product label cell ("CMS") in the top
-    // navigation's centre section and inserts a coloured environment pill immediately after it, so the
-    // bar reads "CMS [ENV]". The badge is appended (not an innerHTML rewrite) so it survives the SPA
-    // re-rendering the label, and is idempotent via the .dxp-env-badge marker. The shell renders
-    // asynchronously, so it retries via a MutationObserver until the cell exists, then disconnects —
-    // with a hard 15s deadline so pages that never show the bar (e.g. login) don't observe forever.
-    private const string EnvIndicatorScript = """
-    (function () {
-        var deadline = Date.now() + 15000;
 
         function apply() {
-            var label = document.querySelector(__DXP_SELECTOR);
+            var label = findLabel();
             if (!label) return false;
-            var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') || label.parentElement;
+            var host = label.closest('.oui-dropdown-group') || label.closest('.oui-button') ||
+                       label.closest('button') || label.parentElement;
             if (!host || !host.parentElement) return false;
-            if (host.parentElement.querySelector('.dxp-env-badge')) return true;
+            if (alreadyBadged(host)) return true;
+
             var badge = document.createElement('span');
-            badge.className = 'dxp-env-badge';
+            badge.className = BADGE_CLASS;
             badge.setAttribute('data-dxp-env', __DXP_ENV);
             badge.textContent = __DXP_LABEL;
-            badge.style.cssText = 'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
-                ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;letter-spacing:0.5px;' +
-                'margin-left:8px;flex-shrink:0;white-space:nowrap;';
+            badge.style.cssText =
+                'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +
+                ';color:' + __DXP_TEXT + ';font-size:11px;font-weight:700;border-radius:3px;' +
+                'letter-spacing:0.5px;margin-left:8px;flex-shrink:0;white-space:nowrap;cursor:pointer;' +
+                'vertical-align:middle;';
+            badge.title = 'DXP Environment Indicator — click to open settings';
+            badge.onclick = function (e) {
+                e.stopPropagation();
+                window.location = '/EPiServer/DxpEnvironmentIndicator/Admin/Settings';
+            };
             host.insertAdjacentElement('afterend', badge);
             return true;
         }
@@ -172,7 +218,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
             var obs = new MutationObserver(function () {
                 if (apply() || Date.now() > deadline) obs.disconnect();
             });
-            obs.observe(document.body, { childList: true, subtree: true });
+            obs.observe(document.body, { childList: true, subtree: true, characterData: true });
             setTimeout(function () { obs.disconnect(); }, 15000);
         }
 

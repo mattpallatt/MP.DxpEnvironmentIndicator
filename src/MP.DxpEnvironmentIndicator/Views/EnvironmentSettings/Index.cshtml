@@ -1,6 +1,4 @@
 @model MP.DxpEnvironmentIndicator.Models.EnvironmentSettingsViewModel
-@using System.Text.Json
-@using MP.DxpEnvironmentIndicator.Services
 @using MP.DxpEnvironmentIndicator.Controllers
 @{
     Layout = null;
@@ -25,21 +23,25 @@
         .env { border: 1px solid #e3e3e3; border-radius: 6px; padding: 16px 18px; margin-bottom: 16px; max-width: 720px; }
         .env h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
         label { display: block; font-size: 13px; font-weight: 500; color: #333; margin: 0 0 4px; }
-        input[type=text] {
+        inpstut[type=text] {
             width: 100%; max-width: 480px; padding: 7px 9px; border: 1px solid #bbb; border-radius: 3px;
             font-size: 14px; margin-bottom: 12px; background: #fff; color: #1a1a1a;
         }
         input[type=text]:focus, input[type=color]:focus { outline: none; border-color: #2973c3; box-shadow: 0 0 0 2px rgba(41,115,195,0.2); }
+        
         .color-row { display: flex; align-items: center; gap: 10px; }
         input[type=color] { width: 42px; height: 30px; padding: 0; border: 1px solid #bbb; border-radius: 3px; background: #fff; cursor: pointer; }
         .color-hint { color: #777; font-size: 12px; }
         .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 22px; max-width: 720px; }
         .checkbox-row label { margin: 0; font-weight: 400; }
-        button {
-            padding: 9px 18px; background: #2973c3; color: #fff; border: none; border-radius: 3px;
-            font-size: 14px; font-weight: 500; cursor: pointer;
+        button, .btn-back {
+            display: inline-block; padding: 9px 18px; font-size: 14px; font-weight: 500; cursor: pointer;
+            border-radius: 3px; text-decoration: none;
         }
+        button { background: #2973c3; color: #fff; border: none; }
         button:hover { background: #1f5ea3; }
+        .btn-back { background: #fff; color: #333; border: 1px solid #bbb; margin-left: 10px; }
+        .btn-back:hover { background: #f5f5f5; border-color: #999; }
         .saved { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
         .error { background: #fdecea; color: #b71c1c; border: 1px solid #ef9a9a; padding: 9px 12px; border-radius: 4px; margin-bottom: 18px; max-width: 720px; }
         details.advanced { max-width: 720px; margin: 0 0 22px; border: 1px solid #e3e3e3; border-radius: 6px; }
@@ -50,8 +52,9 @@
         .advanced-body { padding: 0 16px 16px; }
         .help { color: #777; font-size: 12px; margin: 0 0 8px; max-width: 640px; }
         code { background: #f3f4f6; border: 1px solid #e3e3e3; border-radius: 3px; padding: 1px 5px; font-size: 12px; word-break: break-all; }
+        input[type=submit] {height: 40px;}
     </style>
-</head>
+</head> 
 <body>
     <h1>DXP Environment Indicator</h1>
     <p class="sub">Badge the current DXP environment into the CMS top bar so editors always know where they are.</p>
@@ -138,30 +141,10 @@
             </div>
         </details>
 
+       
+        <a class="btn-back" href="/Optimizely/Settings/default">← Back to Admin</a>
         <button type="submit">Save Settings</button>
     </form>
 
-    @if (Model.Saved)
-    {
-        <script>
-            // This page is iframed into the admin shell (same origin), so on save we update the live
-            // badge in the parent immediately — no logout/login needed. We key off the badge's identity
-            // attribute (not its visible text, which may now be a custom label) and apply that
-            // environment's new label and colours.
-            (function () {
-                try {
-                    var badge = window.top.document.querySelector('.dxp-env-badge');
-                    if (!badge) return;
-                    var map = {
-                        'Integration': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Integration", Model.IntegrationLabel))), bg: '@Model.IntegrationColor', text: '@ContrastColor.Text(Model.IntegrationColor)' },
-                        'Preproduction': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Preproduction", Model.PreproductionLabel))), bg: '@Model.PreproductionColor', text: '@ContrastColor.Text(Model.PreproductionColor)' },
-                        'Production': { label: @Html.Raw(JsonSerializer.Serialize(EnvironmentResolver.EffectiveLabel("Production", Model.ProductionLabel))), bg: '@Model.ProductionColor', text: '@ContrastColor.Text(Model.ProductionColor)' }
-                    };
-                    var c = map[badge.getAttribute('data-dxp-env')];
-                    if (c && c.bg) { badge.textContent = c.label; badge.style.background = c.bg; badge.style.color = c.text; }
-                } catch (e) { /* cross-origin or no parent badge — nothing to update */ }
-            })();
-        </script>
-    }
 </body>
 </html>

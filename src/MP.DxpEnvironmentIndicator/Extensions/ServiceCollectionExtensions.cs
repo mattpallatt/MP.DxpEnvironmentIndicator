@@ -1,6 +1,8 @@
 using EPiServer.Shell.Modules;
+using EPiServer.Shell.Navigation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using MP.DxpEnvironmentIndicator.Menu;
 using MP.DxpEnvironmentIndicator.Middleware;
 using MP.DxpEnvironmentIndicator.Services;
 
@@ -28,6 +30,11 @@ public static class ServiceCollectionExtensions
                 opts.Items.Add(new ModuleDetails { Name = "DxpEnvironmentIndicator" });
             }
         });
+
+        // Register as IMenuProvider via DI in addition to [MenuProvider] attribute scanning.
+        // CMS 13 may discover providers from the DI container rather than (or in addition to)
+        // assembly scanning, so this ensures the shell navigation item is registered regardless.
+        services.AddTransient<IMenuProvider, EnvironmentIndicatorMenuProvider>();
 
         return services;
     }
