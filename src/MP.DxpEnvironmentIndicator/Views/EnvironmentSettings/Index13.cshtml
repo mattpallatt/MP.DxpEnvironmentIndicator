@@ -1,5 +1,6 @@
 @model MP.DxpEnvironmentIndicator.Models.EnvironmentSettingsViewModel
 @using MP.DxpEnvironmentIndicator.Controllers
+@using MP.DxpEnvironmentIndicator.Services
 @using System.Globalization
 @{
     Layout = null;
@@ -19,7 +20,7 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Enviro-helper</title>
+    <title>Environment Labels</title>
     <style>
         body { margin: 0; }
         .env-settings-wrapper {
@@ -83,79 +84,35 @@
 
     <div class="epi-pn-navigation--fixed-adjust">
         <div class="env-settings-wrapper">
-            <h1>Enviro-helper</h1>
-            <p class="sub">Badge the current DXP environment into the CMS top bar so editors always know where they are.</p>
+            <h1>Environment Labels</h1>
+            <p class="sub">Badge this environment into the CMS top bar so editors always know which environment they're working in.</p>
 
             @if (Model.Saved) { <div class="saved">&#10003; Settings saved.</div> }
             @if (!string.IsNullOrEmpty(Model.ErrorMessage)) { <div class="error">@Model.ErrorMessage</div> }
 
             <div class="intro">
-                <p><strong>How it works:</strong> enter the <em>Base URLs</em> for each environment. The running site
-                identifies itself by matching the request host against these URLs — so the same settings can be saved on
-                every environment and each one badges itself correctly.</p>
-                <p>Only the host part of each URL is compared; port and scheme are ignored.</p>
+                <p><strong>How it works:</strong> this add-in runs in one environment, so set the label and colour for
+                <em>this</em> environment. They're stored per environment, so set them once on each slot.</p>
             </div>
 
             <form method="post" action="@Context.Request.Path">
                 @Html.AntiForgeryToken()
 
                 <div class="env">
-                    <h2>Integration</h2>
-                    <label for="i-url">Base URLs</label>
-                    <textarea id="i-url" name="IntegrationBaseUrl" rows="3" placeholder="https://your-inte-slot.dxcloud.episerver.net">@Model.IntegrationBaseUrl</textarea>
-                    <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
-                    <label for="i-label">Environment label</label>
-                    <input type="text" id="i-label" name="IntegrationLabel" value="@Model.IntegrationLabel" placeholder="integration" maxlength="24" />
-                    <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
-                    <label>Badge colour</label>
-                    <div class="color-row">
-                        <input type="color" name="IntegrationColor" value="@(Model.IntegrationColor ?? "#d4651a")" />
-                        <span class="color-hint">Shown as indicator background.</span>
-                        <span class="badge-preview" id="i-preview">INTEGRATION</span>
+                    <div class="checkbox-row" style="margin-top:0">
+                        <input type="checkbox" id="enabled" name="Enabled" value="true" @(Model.Enabled ? "checked" : "") />
+                        <label for="enabled">Show the environment badge</label>
                     </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="disable-integration" name="IntegrationDisabled" value="true" @(Model.IntegrationDisabled ? "checked" : "") />
-                        <label for="disable-integration">Disable indicator in this environment</label>
-                    </div>
-                </div>
 
-                <div class="env">
-                    <h2>Preproduction</h2>
-                    <label for="p-url">Base URLs</label>
-                    <textarea id="p-url" name="PreproductionBaseUrl" rows="3" placeholder="https://your-prep-slot.dxcloud.episerver.net">@Model.PreproductionBaseUrl</textarea>
-                    <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
-                    <label for="p-label">Environment label</label>
-                    <input type="text" id="p-label" name="PreproductionLabel" value="@Model.PreproductionLabel" placeholder="preproduction" maxlength="24" />
-                    <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
-                    <label>Badge colour</label>
-                    <div class="color-row">
-                        <input type="color" name="PreproductionColor" value="@(Model.PreproductionColor ?? "#7b2fff")" />
-                        <span class="color-hint">Shown as indicator background.</span>
-                        <span class="badge-preview" id="p-preview">PREPRODUCTION</span>
-                    </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="disable-preproduction" name="PreproductionDisabled" value="true" @(Model.PreproductionDisabled ? "checked" : "") />
-                        <label for="disable-preproduction">Disable indicator in this environment</label>
-                    </div>
-                </div>
+                    <label for="label">Label</label>
+                    <input type="text" id="label" name="Label" value="@Model.Label" placeholder="e.g. UAT" maxlength="24" />
+                    <p class="help">The text shown in the badge. Leave blank to use the server environment name. Keep it short — it sits in the top bar.</p>
 
-                <div class="env">
-                    <h2>Production</h2>
-                    <label for="pr-url">Base URLs</label>
-                    <textarea id="pr-url" name="ProductionBaseUrl" rows="3" placeholder="https://www.example.com">@Model.ProductionBaseUrl</textarea>
-                    <p class="help">One URL per line. The indicator shows if the site's host matches any of them.</p>
-                    <label for="pr-label">Environment label</label>
-                    <input type="text" id="pr-label" name="ProductionLabel" value="@Model.ProductionLabel" placeholder="production" maxlength="24" />
-                    <p class="help">Leave blank to use the environment name. Keep it short — it sits in the top bar.</p>
-                    <label>Badge colour</label>
+                    <label>Colour</label>
                     <div class="color-row">
-                        <input type="color" name="ProductionColor" value="@(Model.ProductionColor ?? "#c0392b")" />
-                        <span class="color-hint">Shown as indicator background.</span>
-                        <span class="badge-preview" id="pr-preview">PRODUCTION</span>
-                    </div>
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="disable-production" name="ProductionDisabled" value="true" @(Model.ProductionDisabled ? "checked" : "") />
-                        <label for="disable-production">Disable indicator in this environment</label>
+                        <input type="color" id="color" name="Color" value="@(Model.Color ?? EnvironmentResolver.DefaultColor)" />
+                        <span class="color-hint">Shown as the badge background.</span>
+                        <span class="badge-preview" id="preview">ENVIRONMENT</span>
                     </div>
                 </div>
 
@@ -190,26 +147,18 @@
                 return L > 0.179 ? '#1a1a1a' : '#ffffff';
             }
 
-            var envs = [
-                { labelId: 'i-label',  colorName: 'IntegrationColor',   previewId: 'i-preview',  def: 'INTEGRATION' },
-                { labelId: 'p-label',  colorName: 'PreproductionColor', previewId: 'p-preview',  def: 'PREPRODUCTION' },
-                { labelId: 'pr-label', colorName: 'ProductionColor',    previewId: 'pr-preview', def: 'PRODUCTION' }
-            ];
-
-            envs.forEach(function (e) {
-                var labelEl = document.getElementById(e.labelId);
-                var colorEl = document.querySelector('[name="' + e.colorName + '"]');
-                var pill = document.getElementById(e.previewId);
-                if (!pill || !colorEl) return;
-                function update() {
-                    pill.textContent = (labelEl && labelEl.value.trim()) || e.def;
-                    pill.style.background = colorEl.value;
-                    pill.style.color = contrastText(colorEl.value);
-                }
-                if (labelEl) labelEl.addEventListener('input', update);
-                colorEl.addEventListener('input', update);
-                update();
-            });
+            var labelEl = document.getElementById('label');
+            var colorEl = document.getElementById('color');
+            var pill = document.getElementById('preview');
+            if (!pill || !colorEl) return;
+            function update() {
+                pill.textContent = (labelEl && labelEl.value.trim()) || 'ENVIRONMENT';
+                pill.style.background = colorEl.value;
+                pill.style.color = contrastText(colorEl.value);
+            }
+            if (labelEl) labelEl.addEventListener('input', update);
+            colorEl.addEventListener('input', update);
+            update();
         })();
     </script>
 </body>

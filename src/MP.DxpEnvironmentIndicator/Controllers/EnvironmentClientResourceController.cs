@@ -36,7 +36,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     public IActionResult SettingsEntry() => Content("""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>Enviro-helper</title></head>
+        <head><meta charset="utf-8"><title>Environment Labels</title></head>
         <body style="margin:0">
         <script>window.location.replace('/EPiServer/DxpEnvironmentIndicator/settings');</script>
         </body>
@@ -49,7 +49,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     [Route("~/Optimizely/DxpEnvironmentIndicator/ClientResources/init.js")]
     [ResponseCache(Duration = 3600)]
     public IActionResult ModuleInit() =>
-        Content("// Enviro-helper module init", "application/javascript; charset=utf-8");
+        Content("// Environment Labels module init", "application/javascript; charset=utf-8");
 
     // Resolves the environment server-side from the request host and bakes the name, background and
     // (accessibility-aware) text colour, and selector into the script — no client-side fetch and no
@@ -59,15 +59,14 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/EnvIndicator.js")]
     public IActionResult EnvIndicator()
     {
-        var env = resolver.Resolve(Request.Host.Host ?? string.Empty);
+        var env = resolver.Resolve();
         if (env == null)
-            return Content("/* DXP environment indicator: no badge for this environment */", "application/javascript; charset=utf-8");
+            return Content("/* DXP environment indicator: disabled */", "application/javascript; charset=utf-8");
 
         var selector = settings.Get().Selector;
         if (string.IsNullOrWhiteSpace(selector)) selector = DefaultSelector;
 
-        var prelude = $"var __DXP_ENV={JsonSerializer.Serialize(env.Name)};"
-                    + $"var __DXP_LABEL={JsonSerializer.Serialize(env.Label)};"
+        var prelude = $"var __DXP_LABEL={JsonSerializer.Serialize(env.Label)};"
                     + $"var __DXP_COLOR={JsonSerializer.Serialize(env.Color)};"
                     + $"var __DXP_TEXT={JsonSerializer.Serialize(ContrastColor.Text(env.Color))};"
                     + $"var __DXP_SELECTOR={JsonSerializer.Serialize(selector)};\n";
@@ -126,7 +125,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
                 frame = document.createElement('iframe');
                 frame.id    = FRAME_ID;
                 frame.src   = SETTINGS_URL;
-                frame.title = 'Enviro-helper Settings';
+                frame.title = 'Environment Labels Settings';
                 frame.style.cssText = 'position:fixed;border:0;z-index:2147483000;background:#fff;';
                 document.body.appendChild(frame);
             }
@@ -238,7 +237,6 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
 
             var badge = document.createElement('span');
             badge.className = BADGE_CLASS;
-            badge.setAttribute('data-dxp-env', __DXP_ENV);
             badge.textContent = __DXP_LABEL;
             badge.style.cssText =
                 'display:inline-flex;align-items:center;padding:1px 7px;background:' + __DXP_COLOR +

@@ -5,7 +5,7 @@
 		<Nullable>disable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<PackageId>MP.DxpEnvironmentIndicator</PackageId>
-		<Version>1.0.1</Version>
+		<Version>1.1.0</Version>
 		<Authors>Matt Pallatt</Authors>
 		<Description>An Optimizely CMS 12/13 add-in that updates the Optimizely DXP UI to show what enviroment you're working in.</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>

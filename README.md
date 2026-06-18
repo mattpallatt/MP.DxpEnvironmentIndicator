@@ -6,7 +6,7 @@ An Optimizely CMS 12/13 add-in that badges the current DXP environment into the 
 
 ## How it works
 
-The indicator matches the browser's request host against Base URLs you configure in the settings page. The same settings can be saved on every environment — each one identifies itself by host-matching, so nothing breaks when DXP copies database content between slots.
+The add-in runs in exactly one environment, so it has a single **label** and **colour** that always apply to the environment it's deployed in. Set them per slot on the settings page — an enable toggle (on by default) turns the badge on or off. Leave the label blank to fall back to `ASPNETCORE_ENVIRONMENT`.
 
 ## Install
 
@@ -32,25 +32,15 @@ After installing the package, NuGet deploys `modules/_protected/DxpEnvironmentIn
 
 Navigate to the settings page:
 
-- **CMS 12**: Admin → Tools → **Enviro-helper**
-- **CMS 13**: Add-ons → **Enviro-helper**
+- **CMS 12**: Admin → Tools → **Environment Labels**
+- **CMS 13**: Add-ons → **Environment Labels**
 
 | Field | Notes |
 |-------|-------|
-| **Base URLs** | One fully-qualified URL per line. The indicator shows when the request host matches any of them. |
-| **Environment label** | The pill text for that environment. Blank uses the upper-cased environment name. |
-| **Badge colour** | The pill background. Text colour (dark/white) is chosen automatically for contrast. |
-| **Disable indicator** | Check to suppress the badge on a specific environment. |
+| **Show the environment badge** | Master on/off toggle. On by default. |
+| **Label** | The pill text. Blank falls back to the server environment name (`ASPNETCORE_ENVIRONMENT`). |
+| **Colour** | The pill background. Text colour (dark/white) is chosen automatically for contrast. A blank colour uses a neutral grey. |
 | **Advanced → Top-bar selector** | CSS selector override if a CMS update moves the label. |
-
-## Environments
-
-| Environment | Default colour |
-|-------------|---------------|
-| Integration | Orange `#d4651a` |
-| Preproduction | Purple `#7b2fff` |
-| Production | Red `#c0392b` |
-| Development (localhost fallback) | Green `#2e7d32` |
 
 ## Build from source
 

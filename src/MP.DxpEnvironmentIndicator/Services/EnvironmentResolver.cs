@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 
 namespace MP.DxpEnvironmentIndicator.Services;
 
-// Decides which badge (if any) to show for the running environment. Primary signal is the admin
-// page: match the request host against the configured environment BaseUrls. If nothing matches
-// (e.g. a developer on localhost that hasn't been added to the settings), fall back to
-// ASPNETCORE_ENVIRONMENT so local dev still shows a badge. Production is badged unless opted out.
+// Decides the badge for the running environment. The add-in runs in one environment, so this is just
+// the single configured label + colour, shown when enabled. A blank label falls back to
+// ASPNETCORE_ENVIRONMENT so local dev still shows something; a blank colour falls back to neutral grey.
 public class EnvironmentResolver : IEnvironmentResolver
 {
+    // Neutral default pill colour when none is configured.
+    public const string DefaultColor = "#6b7280";
+
     private readonly IEnvironmentSettingsService _settings;
     private readonly IWebHostEnvironment _hostEnvironment;
 
@@ -18,46 +19,15 @@ public class EnvironmentResolver : IEnvironmentResolver
         _hostEnvironment = hostEnvironment;
     }
 
-    public ResolvedEnvironment Resolve(string requestHost)
+    public ResolvedEnvironment Resolve()
     {
-        var settings = _settings.Get();
-        var match = settings.DetectByHost(requestHost);
+        var s = _settings.Get();
+        if (!s.Enabled) return null;
 
-        if (match.Name != null)
-        {
-            bool disabled = match.Name switch
-            {
-                "Integration" => settings.IntegrationDisabled,
-                "Preproduction" => settings.PreproductionDisabled,
-                // Legacy ShowOnProduction=false is treated as disabled; new ProductionDisabled takes precedence.
-                "Production" => settings.ProductionDisabled || !settings.ShowOnProduction,
-                _ => false
-            };
-
-            if (disabled) return null;
-
-            var color = string.IsNullOrWhiteSpace(match.Color) ? DefaultColor(match.Name) : match.Color;
-            return color == null ? null : new ResolvedEnvironment(match.Name, EffectiveLabel(match.Name, match.Label), color);
-        }
-
-        // Unmatched host — only badge it when this is genuinely a local/dev run.
-        if (_hostEnvironment.IsDevelopment())
-            return new ResolvedEnvironment("Development", EffectiveLabel("Development", null), DefaultColor("Development"));
-
-        return null;
+        var label = string.IsNullOrWhiteSpace(s.Label)
+            ? (_hostEnvironment.EnvironmentName ?? "Environment").ToUpperInvariant()
+            : s.Label.Trim();
+        var color = string.IsNullOrWhiteSpace(s.Color) ? DefaultColor : s.Color.Trim();
+        return new ResolvedEnvironment(label, color);
     }
-
-    // The pill text for an environment: the admin's custom label as typed, or the upper-cased
-    // environment name when no override is set. Display only — never used for matching.
-    public static string EffectiveLabel(string name, string customLabel) =>
-        string.IsNullOrWhiteSpace(customLabel) ? name?.ToUpperInvariant() : customLabel.Trim();
-
-    public static string DefaultColor(string name) => name?.ToLowerInvariant() switch
-    {
-        "integration" => "#d4651a",
-        "preproduction" => "#7b2fff",
-        "production" => "#c0392b",
-        "development" => "#2e7d32",
-        _ => null,
-    };
 }
