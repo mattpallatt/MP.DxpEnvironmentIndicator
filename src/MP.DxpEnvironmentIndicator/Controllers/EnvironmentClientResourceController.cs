@@ -36,7 +36,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     public IActionResult SettingsEntry() => Content("""
         <!DOCTYPE html>
         <html>
-        <head><meta charset="utf-8"><title>Environment Labels</title></head>
+        <head><meta charset="utf-8"><title>Environment Label</title></head>
         <body style="margin:0">
         <script>window.location.replace('/EPiServer/DxpEnvironmentIndicator/settings');</script>
         </body>
@@ -49,7 +49,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     [Route("~/Optimizely/DxpEnvironmentIndicator/ClientResources/init.js")]
     [ResponseCache(Duration = 3600)]
     public IActionResult ModuleInit() =>
-        Content("// Environment Labels module init", "application/javascript; charset=utf-8");
+        Content("// Environment Label module init", "application/javascript; charset=utf-8");
 
     // Resolves the environment server-side from the request host and bakes the name, background and
     // (accessibility-aware) text colour, and selector into the script — no client-side fetch and no
@@ -125,7 +125,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
                 frame = document.createElement('iframe');
                 frame.id    = FRAME_ID;
                 frame.src   = SETTINGS_URL;
-                frame.title = 'Environment Labels Settings';
+                frame.title = 'Environment Label Settings';
                 frame.style.cssText = 'position:fixed;border:0;z-index:2147483000;background:#fff;';
                 document.body.appendChild(frame);
             }

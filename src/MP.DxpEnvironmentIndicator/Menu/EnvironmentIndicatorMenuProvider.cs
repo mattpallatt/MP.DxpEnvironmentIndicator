@@ -24,7 +24,7 @@ public class EnvironmentIndicatorMenuProvider : IMenuProvider
             return new[]
             {
                 new UrlMenuItem(
-                    "Environment Labels",
+                    "Environment Label",
                     MenuPaths.Global + "/cms/dxpenvindicator",
                     "/Optimizely/DxpEnvironmentIndicator/settings.html")
                 {
@@ -40,7 +40,7 @@ public class EnvironmentIndicatorMenuProvider : IMenuProvider
         return new[]
         {
             new UrlMenuItem(
-                "Environment Labels",
+                "Environment Label",
                 "/global/cms/admin/tools/dxp.envindicator",
                 "/EPiServer/EPiServer.Cms.UI.Admin/default#/EnvIndicator/Settings")
             {
