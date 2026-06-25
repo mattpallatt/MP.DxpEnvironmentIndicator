@@ -5,7 +5,7 @@
 		<Nullable>disable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<PackageId>MP.DxpEnvironmentIndicator</PackageId>
-		<Version>1.1.0</Version>
+		<Version>1.2.0</Version>
 		<Authors>Matt Pallatt</Authors>
 		<Description>An Optimizely CMS 12/13 add-in that updates the Optimizely DXP UI to show what enviroment you're working in.</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -16,19 +16,6 @@
 
 	<ItemGroup>
 		<None Include="../../README.md" Pack="true" PackagePath="\" />
-	</ItemGroup>
-
-	<!-- Module files deployed to the consuming host's modules/_protected/ folder by NuGet.
-       The module.config registers the add-in with the Optimizely shell module finder;
-       ClientResources/init.js is the AMD stub that puts the module in the shell's JS registry
-       so URLs under /Optimizely/DxpEnvironmentIndicator/ are loaded within the shell canvas. -->
-	<ItemGroup>
-		<Content Update="modules\_protected\DxpEnvironmentIndicator\module.config"
-				 Pack="true"
-				 PackagePath="content\any\any\modules\_protected\DxpEnvironmentIndicator\module.config" />
-		<Content Update="modules\_protected\DxpEnvironmentIndicator\ClientResources\init.js"
-				 Pack="true"
-				 PackagePath="content\any\any\modules\_protected\DxpEnvironmentIndicator\ClientResources\init.js" />
 	</ItemGroup>
 
 	<ItemGroup>

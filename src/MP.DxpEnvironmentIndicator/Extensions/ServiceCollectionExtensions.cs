@@ -1,3 +1,4 @@
+using EPiServer.Shell.Modules;
 using EPiServer.Shell.Navigation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,15 +19,19 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IStartupFilter, EnvIndicatorStartupFilter>();
 
-        // The module is discovered automatically by the Optimizely module finder scanning
-        // ~/modules/_protected/DxpEnvironmentIndicator/module.config in the host app.
-        // No manual ProtectedModuleOptions registration is needed — and adding one causes the
-        // module finder to look in ~/Optimizely/{Name} (the virtual path) instead of the correct
-        // physical ~/modules/_protected/{Name} path, producing the "couldn't find directory" error.
+        // Register the protected module so Optimizely's shell recognises our URLs and the
+        // [MenuProvider] attribute on EnvironmentIndicatorMenuProvider is picked up by the
+        // module scanner. Without this registration the menu item does not appear in CMS 12.
+        services.Configure<ProtectedModuleOptions>(opts =>
+        {
+            if (!opts.Items.Any(x => string.Equals(x.Name, "DxpEnvironmentIndicator", StringComparison.OrdinalIgnoreCase)))
+                opts.Items.Add(new ModuleDetails { Name = "DxpEnvironmentIndicator" });
+        });
 
-        // Register via DI for all CMS versions.  The [MenuProvider] attribute has been removed from
-        // the provider class because CMS 12 both attribute-scans and resolves IMenuProvider from DI,
-        // causing duplicate menu entries when both mechanisms are active.
+        // The Optimizely docs show IMenuProvider implementations using constructor injection,
+        // meaning Optimizely instantiates them via DI (not Activator.CreateInstance). The
+        // [MenuProvider] attribute on the class is the *discovery* signal; DI registration is
+        // the *instantiation* path. Both are required for the menu item to appear.
         services.AddTransient<IMenuProvider, EnvironmentIndicatorMenuProvider>();
 
         return services;

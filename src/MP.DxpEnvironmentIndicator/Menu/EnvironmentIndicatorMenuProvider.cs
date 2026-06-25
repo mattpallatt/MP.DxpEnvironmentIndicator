@@ -2,10 +2,11 @@ using EPiServer.Shell.Navigation;
 
 namespace MP.DxpEnvironmentIndicator.Menu;
 
-// Registered via DI only (services.AddTransient<IMenuProvider, ...> in ServiceCollectionExtensions).
-// The [MenuProvider] attribute is intentionally absent: on CMS 12, EPiServer both attribute-scans
-// and resolves IMenuProvider from DI, so combining the attribute with an explicit DI registration
-// produces duplicate menu entries.  DI-only gives exactly one entry on both CMS versions.
+// [MenuProvider] attribute is required for CMS 12, which discovers IMenuProvider implementations
+// via assembly attribute-scanning rather than DI. CMS 13 dropped attribute scanning and resolves
+// IMenuProvider from DI instead — so DI registration is conditionally added for CMS 13 only in
+// ServiceCollectionExtensions, avoiding duplicate entries on either version.
+[MenuProvider]
 public class EnvironmentIndicatorMenuProvider : IMenuProvider
 {
     private static readonly bool _isCms13 =
@@ -15,18 +16,16 @@ public class EnvironmentIndicatorMenuProvider : IMenuProvider
     {
         if (_isCms13)
         {
-            // Short /{module}/settings URL so the CMS 13 shell SPA router matches the
-            // /{prefix}/{module}/{resource} pattern and iframe-loads it inside the shell
-            // content area rather than doing a full-page navigation.
-            // Point at the physical settings.html in the module directory.
-            // The shell's module router can serve and iframe-load physical module files;
-            // settings.html then redirects the iframe to our Razor controller.
+            // Docs: "Add a second-level menu to the existing admin menu" uses /global/cms/admin/...
+            // In CMS 13 the admin menu is labelled "Settings" in the UI. Use the same path
+            // hierarchy as CMS 12 so the item lands in the same section on both versions.
+            // Point directly at the Razor controller — no intermediate redirect.
             return new[]
             {
                 new UrlMenuItem(
                     "Environment Label",
-                    MenuPaths.Global + "/cms/dxpenvindicator",
-                    "/Optimizely/DxpEnvironmentIndicator/settings.html")
+                    MenuPaths.Global + "/cms/admin/tools/dxp.envindicator",
+                    "/EPiServer/DxpEnvironmentIndicator/settings")
                 {
                     IsAvailable = _ => true,
                     SortIndex = SortIndex.Last + 1
