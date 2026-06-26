@@ -169,7 +169,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     // poll (cheap once badged — a single querySelector early-out) rather than a subtree MutationObserver
     // reacting to every shell mutation; polling for the session also lets the badge self-heal if the
     // CMS re-renders the top bar and strips our node.
-    private const string EnvIndicatorScript = """
+    internal const string EnvIndicatorScript = """
     (function () {
         var POLL_MS = 500;
         var BADGE_CLASS = 'dxp-env-badge';
