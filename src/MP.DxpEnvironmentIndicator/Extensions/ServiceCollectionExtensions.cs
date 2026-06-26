@@ -10,6 +10,9 @@ namespace MP.DxpEnvironmentIndicator.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    private static readonly bool _isCms13 =
+        typeof(EPiServer.Core.ContentReference).Assembly.GetName().Version?.Major >= 13;
+
     public static IServiceCollection AddDxpEnvironmentIndicator(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -19,19 +22,21 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IStartupFilter, EnvIndicatorStartupFilter>();
 
-        // Register the protected module so Optimizely's shell recognises our URLs and the
-        // [MenuProvider] attribute on EnvironmentIndicatorMenuProvider is picked up by the
-        // module scanner. Without this registration the menu item does not appear in CMS 12.
-        services.Configure<ProtectedModuleOptions>(opts =>
+        // CMS 12 only: register the protected module so the shell picks up the
+        // [MenuProvider] attribute via its module scanner. In CMS 13 the module
+        // registration is not needed for menu discovery (IMenuProvider DI registration
+        // below is sufficient) and it creates an unwanted Add-ons sidebar entry.
+        if (!_isCms13)
         {
-            if (!opts.Items.Any(x => string.Equals(x.Name, "DxpEnvironmentIndicator", StringComparison.OrdinalIgnoreCase)))
-                opts.Items.Add(new ModuleDetails { Name = "DxpEnvironmentIndicator" });
-        });
+            services.Configure<ProtectedModuleOptions>(opts =>
+            {
+                if (!opts.Items.Any(x => string.Equals(x.Name, "DxpEnvironmentIndicator", StringComparison.OrdinalIgnoreCase)))
+                    opts.Items.Add(new ModuleDetails { Name = "DxpEnvironmentIndicator" });
+            });
+        }
 
-        // The Optimizely docs show IMenuProvider implementations using constructor injection,
-        // meaning Optimizely instantiates them via DI (not Activator.CreateInstance). The
-        // [MenuProvider] attribute on the class is the *discovery* signal; DI registration is
-        // the *instantiation* path. Both are required for the menu item to appear.
+        // CMS 12: [MenuProvider] is the discovery signal; DI is the instantiation path — both required.
+        // CMS 13: DI registration alone is sufficient; attribute scanning is not used.
         services.AddTransient<IMenuProvider, EnvironmentIndicatorMenuProvider>();
 
         return services;

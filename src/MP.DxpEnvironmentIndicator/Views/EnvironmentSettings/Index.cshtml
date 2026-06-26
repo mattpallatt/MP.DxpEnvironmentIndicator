@@ -113,6 +113,39 @@
         <button type="submit">Save Settings</button>
     </form>
 
+    @if (Model.Saved)
+    {
+        <text>
+        <script>
+        // CMS 12: this page loads inside an iframe; the badge lives in the parent shell window.
+        // Patch the parent window's badge globals and remove the old badge so the polling interval
+        // in EnvIndicator.js immediately re-creates it with the new values.
+        (function () {
+            try {
+                if (window.parent === window) return;
+                var label = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Label ?? ""));
+                var color = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Color ?? MP.DxpEnvironmentIndicator.Services.EnvironmentResolver.DefaultColor));
+                function lin(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+                function contrastText(hex) {
+                    var m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((hex || '').trim());
+                    if (!m) return '#ffffff';
+                    var h = m[1]; if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+                    var L = 0.2126*lin(parseInt(h.substr(0,2),16)) + 0.7152*lin(parseInt(h.substr(2,2),16)) + 0.0722*lin(parseInt(h.substr(4,2),16));
+                    return L > 0.179 ? '#1a1a1a' : '#ffffff';
+                }
+                if (typeof window.parent.__DXP_LABEL !== 'undefined') {
+                    window.parent.__DXP_LABEL = label;
+                    window.parent.__DXP_COLOR = color;
+                    window.parent.__DXP_TEXT = contrastText(color);
+                    var old = window.parent.document.querySelectorAll('.dxp-env-badge');
+                    for (var i = 0; i < old.length; i++) old[i].remove();
+                }
+            } catch(e) {}
+        })();
+        </script>
+        </text>
+    }
+
     <script>
         // Live preview of the badge: updates as the colour/label change, with the same WCAG-contrast
         // text colour the server bakes into the real badge (luminance crossover 0.179).

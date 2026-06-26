@@ -32,7 +32,9 @@ public class EnvironmentSettingsController : Controller
         var view = _isCms13
             ? "~/Views/EnvironmentSettings/Index13.cshtml"
             : "~/Views/EnvironmentSettings/Index.cshtml";
-        return View(view, MapToViewModel(settings));
+        var model = MapToViewModel(settings);
+        model.Saved = TempData["Saved"] != null;
+        return View(view, model);
     }
 
     [HttpPost]
@@ -52,7 +54,8 @@ public class EnvironmentSettingsController : Controller
                 Color = model.Color?.Trim(),
                 Selector = Clean(model.Selector)
             });
-            model.Saved = true;
+            TempData["Saved"] = true;
+            return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {

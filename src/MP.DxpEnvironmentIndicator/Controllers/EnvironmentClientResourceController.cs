@@ -57,6 +57,7 @@ public class EnvironmentClientResourceController(IEnvironmentResolver resolver, 
     // should show (production opt-out, or an unmatched host outside local dev) an inert script is returned.
     [HttpGet]
     [Route("~/EPiServer/DxpEnvironmentIndicator/ClientResources/Scripts/EnvIndicator.js")]
+    [ResponseCache(Duration = 0, NoStore = true)]
     public IActionResult EnvIndicator()
     {
         var env = resolver.Resolve();
